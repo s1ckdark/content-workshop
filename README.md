@@ -25,7 +25,7 @@ YouTube 기능은 아래 순서로 동작합니다.
 6. KittenTTS로 음성 생성
 7. Whisper 또는 AssemblyAI로 자막 생성
 8. MoviePy로 세로 영상 합성
-9. Selenium으로 YouTube Studio 업로드
+9. Playwright로 YouTube Studio 업로드
 
 핵심 구현은 [src/classes/YouTube.py](src/classes/YouTube.py)에 있습니다.
 
@@ -43,7 +43,7 @@ python3 src/main.py
 ## 요구 사항
 
 - Python 3.12
-- Firefox + 로그인된 프로필
+- Chrome 또는 Chromium 기반 프로필
 - Ollama
 - ImageMagick
 - YouTube 생성 기능 사용 시 Gemini API 키
@@ -55,7 +55,7 @@ python3 src/main.py
 
 - `ollama_model`: 텍스트 생성에 사용할 Ollama 모델
 - `nanobanana2_api_key`: Gemini 이미지 API 키
-- `firefox_profile`: 업로드/게시용 Firefox 프로필 경로
+- `browser_profile`: 업로드/게시용 Chrome/Chromium user data dir
 - `zip_url`: 배경음악 ZIP URL
 - `stt_provider`: `local_whisper` 또는 `third_party_assemblyai`
 

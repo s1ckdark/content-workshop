@@ -10,26 +10,39 @@ from config import *
 DEFAULT_SONG_ARCHIVE_URLS = []
 
 
-def close_running_selenium_instances() -> None:
+def close_running_browser_instances() -> None:
     """
-    Closes any running Selenium instances.
+    Closes running Chrome-family browser processes that may hold the profile lock.
 
     Returns:
         None
     """
     try:
-        info(" => Closing running Selenium instances...")
+        info(" => Closing running Chrome/Chromium instances...")
 
-        # Kill all running Firefox instances
         if platform.system() == "Windows":
-            os.system("taskkill /f /im firefox.exe")
+            os.system("taskkill /f /im chrome.exe")
+            os.system("taskkill /f /im msedge.exe")
+            os.system("taskkill /f /im chromium.exe")
         else:
-            os.system("pkill firefox")
+            os.system("pkill -f 'Google Chrome'")
+            os.system("pkill -f Chromium")
+            os.system("pkill -f chrome")
 
-        success(" => Closed running Selenium instances.")
+        success(" => Closed running Chrome/Chromium instances.")
 
     except Exception as e:
-        error(f"Error occurred while closing running Selenium instances: {str(e)}")
+        error(f"Error occurred while closing running browser instances: {str(e)}")
+
+
+def close_running_selenium_instances() -> None:
+    """
+    Backwards-compatible alias for older Firefox/Selenium-based flows.
+
+    Returns:
+        None
+    """
+    close_running_browser_instances()
 
 
 def build_url(youtube_video_id: str) -> str:

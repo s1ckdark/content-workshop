@@ -14,13 +14,13 @@ YouTube 기능은 아래 구성으로 이어집니다.
 6. KittenTTS로 음성 생성
 7. faster-whisper 또는 AssemblyAI로 자막 생성
 8. MoviePy로 세로 영상 합성
-9. Firefox 프로필을 이용해 YouTube Studio 업로드
+9. Chrome/Chromium 프로필을 이용해 YouTube Studio 업로드
 
 ## 필요한 설정
 
 ```json
 {
-  "firefox_profile": "/path/to/firefox/profile",
+  "browser_profile": "/path/to/chrome/user-data",
   "headless": true,
   "ollama_base_url": "http://127.0.0.1:11434",
   "ollama_model": "llama3.2:3b",
@@ -34,4 +34,4 @@ YouTube 기능은 아래 구성으로 이어집니다.
 
 - 배경음악은 `Songs/` 폴더에 직접 넣거나 `zip_url`로 받아옵니다.
 - 스케줄러는 foreground 방식입니다.
-- DOM 구조가 바뀌면 Selenium 업로드가 깨질 수 있으니 정기 점검이 필요합니다.
+- DOM 구조가 바뀌면 Playwright 업로드가 깨질 수 있으니 정기 점검이 필요합니다.

@@ -1,6 +1,6 @@
 # Twitter/X Automation
 
-이 기능은 주제 기반 텍스트를 생성하고 Firefox 프로필을 사용해 X에 직접 게시합니다.
+이 기능은 주제 기반 텍스트를 생성하고 Chrome/Chromium 프로필을 사용해 X에 직접 게시합니다.
 
 ## 필요한 설정
 
@@ -16,5 +16,5 @@
 ## 메모
 
 - 게시 기능과 스케줄러 기능 모두 Ollama 모델이 필요합니다.
-- 로그인 상태가 유지된 Firefox 프로필이 필요합니다.
+- 로그인 상태가 유지된 Chrome/Chromium user data dir가 필요합니다.
 - X의 compose DOM 구조가 바뀌면 선택자 보정이 필요합니다.

@@ -98,6 +98,19 @@ def ensure_song_library() -> bool:
     return True
 
 
+def get_account_browser_profile(account: dict) -> str:
+    """
+    Returns the account browser profile path with legacy Firefox fallback.
+
+    Args:
+        account (dict): Account payload
+
+    Returns:
+        path (str): Browser profile path
+    """
+    return account.get("browser_profile") or account.get("firefox_profile", "")
+
+
 def run_scheduler(command: list[str], scheduler_options: list[str], label: str) -> None:
     """
     Runs the selected schedule in the foreground until interrupted.
@@ -189,14 +202,14 @@ def main():
 
                 success(f" => Generated ID: {generated_uuid}")
                 nickname = question(" => Enter a nickname for this account: ")
-                fp_profile = question(" => Enter the path to the Firefox profile: ")
+                fp_profile = question(" => Enter the path to the Chrome user data directory: ")
                 niche = question(" => Enter the account niche: ")
                 language = question(" => Enter the account language: ")
 
                 account_data = {
                     "id": generated_uuid,
                     "nickname": nickname,
-                    "firefox_profile": fp_profile,
+                    "browser_profile": fp_profile,
                     "niche": niche,
                     "language": language,
                     "videos": [],
@@ -252,7 +265,7 @@ def main():
                 youtube = YouTube(
                     selected_account["id"],
                     selected_account["nickname"],
-                    selected_account["firefox_profile"],
+                    get_account_browser_profile(selected_account),
                     selected_account["niche"],
                     selected_account["language"]
                 )
@@ -346,13 +359,13 @@ def main():
 
                 success(f" => Generated ID: {generated_uuid}")
                 nickname = question(" => Enter a nickname for this account: ")
-                fp_profile = question(" => Enter the path to the Firefox profile: ")
+                fp_profile = question(" => Enter the path to the Chrome user data directory: ")
                 topic = question(" => Enter the account topic: ")
 
                 add_account("twitter", {
                     "id": generated_uuid,
                     "nickname": nickname,
-                    "firefox_profile": fp_profile,
+                    "browser_profile": fp_profile,
                     "topic": topic,
                     "posts": []
                 })
@@ -400,7 +413,12 @@ def main():
                 error("Invalid account selected. Please try again.", "red")
                 return
             else:
-                twitter = Twitter(selected_account["id"], selected_account["nickname"], selected_account["firefox_profile"], selected_account["topic"])
+                twitter = Twitter(
+                    selected_account["id"],
+                    selected_account["nickname"],
+                    get_account_browser_profile(selected_account),
+                    selected_account["topic"],
+                )
 
                 try:
                     while True:
@@ -499,7 +517,13 @@ def main():
                     "twitter_uuid": twitter_uuid
                 })
 
-                afm = AffiliateMarketing(affiliate_link, account["firefox_profile"], account["id"], account["nickname"], account["topic"])
+                afm = AffiliateMarketing(
+                    affiliate_link,
+                    get_account_browser_profile(account),
+                    account["id"],
+                    account["nickname"],
+                    account["topic"],
+                )
 
                 try:
                     afm.generate_pitch()
@@ -540,7 +564,13 @@ def main():
                     error("Twitter account linked to this product no longer exists.")
                     return
 
-                afm = AffiliateMarketing(selected_product["affiliate_link"], account["firefox_profile"], account["id"], account["nickname"], account["topic"])
+                afm = AffiliateMarketing(
+                    selected_product["affiliate_link"],
+                    get_account_browser_profile(account),
+                    account["id"],
+                    account["nickname"],
+                    account["topic"],
+                )
 
                 try:
                     afm.generate_pitch()

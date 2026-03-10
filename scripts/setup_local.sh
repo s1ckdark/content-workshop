@@ -49,17 +49,16 @@ if [[ -z "$MAGICK_PATH" ]]; then
   MAGICK_PATH="$(command -v convert || true)"
 fi
 
-FIREFOX_PROFILE=""
-if [[ -d "$HOME/Library/Application Support/Firefox/Profiles" ]]; then
-  FIREFOX_PROFILE="$(find "$HOME/Library/Application Support/Firefox/Profiles" -maxdepth 1 -type d -name "*default-release*" | head -n 1 || true)"
-  if [[ -z "$FIREFOX_PROFILE" ]]; then
-    FIREFOX_PROFILE="$(find "$HOME/Library/Application Support/Firefox/Profiles" -maxdepth 1 -type d | tail -n +2 | head -n 1 || true)"
-  fi
+BROWSER_PROFILE=""
+if [[ -d "$HOME/Library/Application Support/Google/Chrome" ]]; then
+  BROWSER_PROFILE="$HOME/Library/Application Support/Google/Chrome"
+elif [[ -d "$HOME/Library/Application Support/Chromium" ]]; then
+  BROWSER_PROFILE="$HOME/Library/Application Support/Chromium"
 fi
 
 OLLAMA_MODELS_JSON="$(curl -sS http://127.0.0.1:11434/api/tags || true)"
 
-MAGICK_PATH="$MAGICK_PATH" FIREFOX_PROFILE="$FIREFOX_PROFILE" "$PYTHON_BIN" - <<'PY'
+MAGICK_PATH="$MAGICK_PATH" BROWSER_PROFILE="$BROWSER_PROFILE" "$PYTHON_BIN" - <<'PY'
 import json
 import os
 import subprocess
@@ -88,9 +87,9 @@ magick_path = os.environ.get("MAGICK_PATH", "")
 if magick_path:
     cfg["imagemagick_path"] = magick_path
 
-firefox_profile = os.environ.get("FIREFOX_PROFILE", "")
-if firefox_profile and not cfg.get("firefox_profile"):
-    cfg["firefox_profile"] = firefox_profile
+browser_profile = os.environ.get("BROWSER_PROFILE", "")
+if browser_profile and not cfg.get("browser_profile"):
+    cfg["browser_profile"] = browser_profile
 
 # Pick a reasonable installed Ollama model.
 ollama_model = cfg.get("ollama_model", "llama3.2:3b")
@@ -135,6 +134,8 @@ print(f"[setup] ollama_model={cfg.get('ollama_model')}")
 print(f"[setup] nanobanana2_model={cfg.get('nanobanana2_model')}")
 print(f"[setup] stt_provider={cfg.get('stt_provider')}")
 PY
+
+"$PYTHON_BIN" -m playwright install chromium
 
 echo "[setup] Running local preflight..."
 "$PYTHON_BIN" scripts/preflight_local.py || true

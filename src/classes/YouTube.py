@@ -9,6 +9,7 @@ import assemblyai as aai
 from utils import *
 from cache import *
 from .Tts import TTS
+from browser import close_browser_context, get_active_page, launch_persistent_chromium
 from llm_provider import generate_text
 from config import *
 from status import *
@@ -17,15 +18,9 @@ from constants import *
 from typing import List
 from moviepy.editor import *
 from termcolor import colored
-from selenium_firefox import *
-from selenium import webdriver
 from moviepy.video.fx.all import crop
 from moviepy.config import change_settings
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
 from moviepy.video.tools.subtitles import SubtitlesClip
-from webdriver_manager.firefox import GeckoDriverManager
 from datetime import datetime
 
 # Set ImageMagick Path
@@ -61,7 +56,7 @@ class YouTube:
         Args:
             account_uuid (str): The unique identifier for the YouTube account.
             account_nickname (str): The nickname for the YouTube account.
-            fp_profile_path (str): Path to the firefox profile that is logged into the specificed YouTube Account.
+            fp_profile_path (str): Path to the Chrome user data dir logged into the specified YouTube account.
             niche (str): The niche of the provided YouTube Channel.
             language (str): The language of the Automation.
 
@@ -75,29 +70,7 @@ class YouTube:
         self._language: str = language
 
         self.images = []
-
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
-        if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(self._fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {self._fp_profile_path}"
-            )
-
-        self.options.add_argument("-profile")
-        self.options.add_argument(self._fp_profile_path)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
+        self.playwright, self.context = launch_persistent_chromium(self._fp_profile_path)
 
     @property
     def niche(self) -> str:
@@ -692,10 +665,10 @@ class YouTube:
         Returns:
             channel_id (str): The Channel ID.
         """
-        driver = self.browser
-        driver.get("https://studio.youtube.com")
-        time.sleep(2)
-        channel_id = driver.current_url.split("/")[-1]
+        page = get_active_page(self.context)
+        page.goto("https://studio.youtube.com", wait_until="domcontentloaded")
+        page.wait_for_timeout(2000)
+        channel_id = page.url.rstrip("/").split("/")[-1].split("?")[0]
         self.channel_id = channel_id
 
         return channel_id
@@ -710,118 +683,119 @@ class YouTube:
         try:
             self.get_channel_id()
 
-            driver = self.browser
+            page = get_active_page(self.context)
             verbose = get_verbose()
 
             # Go to youtube.com/upload
-            driver.get("https://www.youtube.com/upload")
+            page.goto("https://www.youtube.com/upload", wait_until="domcontentloaded")
 
             # Set video file
-            FILE_PICKER_TAG = "ytcp-uploads-file-picker"
-            file_picker = driver.find_element(By.TAG_NAME, FILE_PICKER_TAG)
-            INPUT_TAG = "input"
-            file_input = file_picker.find_element(By.TAG_NAME, INPUT_TAG)
-            file_input.send_keys(self.video_path)
+            page.locator("ytcp-uploads-file-picker input[type='file']").set_input_files(
+                self.video_path
+            )
 
             # Wait for upload to finish
-            time.sleep(5)
+            page.wait_for_timeout(5000)
 
             # Set title
-            textboxes = driver.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)
-
-            title_el = textboxes[0]
-            description_el = textboxes[-1]
+            title_el = page.locator(f"#{YOUTUBE_TEXTBOX_ID}").first
+            description_el = page.locator(f"#{YOUTUBE_TEXTBOX_ID}").last
 
             if verbose:
                 info("\t=> Setting title...")
 
             title_el.click()
-            time.sleep(1)
-            title_el.clear()
-            title_el.send_keys(self.metadata["title"])
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.press("Backspace")
+            page.keyboard.type(self.metadata["title"])
 
             if verbose:
                 info("\t=> Setting description...")
 
             # Set description
-            time.sleep(10)
+            page.wait_for_timeout(10000)
             description_el.click()
-            time.sleep(0.5)
-            description_el.clear()
-            description_el.send_keys(self.metadata["description"])
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.press("Backspace")
+            page.keyboard.type(self.metadata["description"])
 
-            time.sleep(0.5)
+            page.wait_for_timeout(500)
 
             # Set `made for kids` option
             if verbose:
                 info("\t=> Setting `made for kids` option...")
 
-            is_for_kids_checkbox = driver.find_element(
-                By.NAME, YOUTUBE_MADE_FOR_KIDS_NAME
-            )
-            is_not_for_kids_checkbox = driver.find_element(
-                By.NAME, YOUTUBE_NOT_MADE_FOR_KIDS_NAME
-            )
+            is_for_kids_checkbox = page.locator(
+                f"[name='{YOUTUBE_MADE_FOR_KIDS_NAME}']"
+            ).first
+            is_not_for_kids_checkbox = page.locator(
+                f"[name='{YOUTUBE_NOT_MADE_FOR_KIDS_NAME}']"
+            ).first
 
             if not get_is_for_kids():
                 is_not_for_kids_checkbox.click()
             else:
                 is_for_kids_checkbox.click()
 
-            time.sleep(0.5)
+            page.wait_for_timeout(500)
 
             # Click next
             if verbose:
                 info("\t=> Clicking next...")
 
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
+            next_button = page.locator(f"#{YOUTUBE_NEXT_BUTTON_ID}").first
             next_button.click()
 
             # Click next again
             if verbose:
                 info("\t=> Clicking next again...")
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
+            next_button = page.locator(f"#{YOUTUBE_NEXT_BUTTON_ID}").first
             next_button.click()
 
             # Wait for 2 seconds
-            time.sleep(2)
+            page.wait_for_timeout(2000)
 
             # Click next again
             if verbose:
                 info("\t=> Clicking next again...")
-            next_button = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
+            next_button = page.locator(f"#{YOUTUBE_NEXT_BUTTON_ID}").first
             next_button.click()
 
             # Set as unlisted
             if verbose:
                 info("\t=> Setting as unlisted...")
 
-            radio_button = driver.find_elements(By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH)
-            radio_button[2].click()
+            page.locator(f"xpath={YOUTUBE_RADIO_BUTTON_XPATH}").nth(2).click()
 
             if verbose:
                 info("\t=> Clicking done button...")
 
             # Click done button
-            done_button = driver.find_element(By.ID, YOUTUBE_DONE_BUTTON_ID)
+            done_button = page.locator(f"#{YOUTUBE_DONE_BUTTON_ID}").first
             done_button.click()
 
             # Wait for 2 seconds
-            time.sleep(2)
+            page.wait_for_timeout(2000)
 
             # Get latest video
             if verbose:
                 info("\t=> Getting video URL...")
 
             # Get the latest uploaded video URL
-            driver.get(
-                f"https://studio.youtube.com/channel/{self.channel_id}/videos/short"
+            page.goto(
+                f"https://studio.youtube.com/channel/{self.channel_id}/videos/short",
+                wait_until="domcontentloaded",
             )
-            time.sleep(2)
-            videos = driver.find_elements(By.TAG_NAME, "ytcp-video-row")
-            first_video = videos[0]
-            anchor_tag = first_video.find_element(By.TAG_NAME, "a")
-            href = anchor_tag.get_attribute("href")
+            page.wait_for_timeout(2000)
+            href = (
+                page.locator("ytcp-video-row")
+                .first
+                .locator("a")
+                .first
+                .get_attribute("href")
+            )
+            if not href:
+                raise RuntimeError("Could not resolve uploaded video URL from YouTube Studio.")
             if verbose:
                 info(f"\t=> Extracting video ID from URL: {href}")
             video_id = href.split("/")[-2]
@@ -844,13 +818,9 @@ class YouTube:
                 }
             )
 
-            # Close the browser
-            driver.quit()
-
             return True
         except Exception as exc:
             error(f"Failed to upload video: {exc}")
-            self.browser.quit()
             return False
 
     def get_videos(self) -> List[dict]:
@@ -884,7 +854,4 @@ class YouTube:
         Returns:
             None
         """
-        try:
-            self.browser.quit()
-        except Exception:
-            pass
+        close_browser_context(getattr(self, "playwright", None), getattr(self, "context", None))

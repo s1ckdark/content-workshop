@@ -13,7 +13,7 @@
 
 ```json
 {
-  "firefox_profile": "/path/to/firefox/profile",
+  "browser_profile": "/path/to/chrome/user-data",
   "headless": true,
   "ollama_base_url": "http://127.0.0.1:11434",
   "ollama_model": "llama3.2:3b"

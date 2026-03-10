@@ -68,14 +68,25 @@ def get_verbose() -> bool:
     """
     return load_config()["verbose"]
 
-def get_firefox_profile_path() -> str:
+def get_browser_profile_path() -> str:
     """
-    Gets the path to the Firefox profile.
+    Gets the path to the Chrome/Chromium user data dir.
 
     Returns:
-        path (str): The path to the Firefox profile
+        path (str): The browser profile path
     """
-    return load_config()["firefox_profile"]
+    config = load_config()
+    return config.get("browser_profile") or config.get("firefox_profile", "")
+
+
+def get_firefox_profile_path() -> str:
+    """
+    Backwards-compatible alias for older Firefox-based configuration.
+
+    Returns:
+        path (str): Browser profile path
+    """
+    return get_browser_profile_path()
 
 def get_headless() -> bool:
     """

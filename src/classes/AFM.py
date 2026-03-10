@@ -1,18 +1,13 @@
 import os
-from urllib.parse import urlparse
 from typing import Any
+from urllib.parse import urlparse
 
 from status import *
 from config import *
+from browser import close_browser_context, get_active_page, launch_persistent_chromium
 from constants import *
 from llm_provider import generate_text
 from .Twitter import Twitter
-from selenium_firefox import *
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
-from webdriver_manager.firefox import GeckoDriverManager
 
 
 class AffiliateMarketing:
@@ -33,7 +28,7 @@ class AffiliateMarketing:
 
         Args:
             affiliate_link (str): The affiliate link
-            fp_profile_path (str): The path to the Firefox profile
+            fp_profile_path (str): The path to the Chrome user data directory
             twitter_account_uuid (str): The Twitter account UUID
             account_nickname (str): The account nickname
             topic (str): The topic of the product
@@ -43,29 +38,7 @@ class AffiliateMarketing:
         """
         self._fp_profile_path: str = fp_profile_path
 
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
-        if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {fp_profile_path}"
-            )
-
-        # Set the profile path
-        self.options.add_argument("-profile")
-        self.options.add_argument(fp_profile_path)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
+        self.playwright, self.context = launch_persistent_chromium(fp_profile_path)
 
         # Set the affiliate link
         self.affiliate_link: str = affiliate_link
@@ -93,16 +66,14 @@ class AffiliateMarketing:
         This method will be used to scrape the product
         information from the affiliate link.
         """
-        # Open the affiliate link
-        self.browser.get(self.affiliate_link)
+        page = get_active_page(self.context)
+        page.goto(self.affiliate_link, wait_until="domcontentloaded")
 
         # Get the product name
-        product_title: str = self.browser.find_element(
-            By.ID, AMAZON_PRODUCT_TITLE_ID
-        ).text
+        product_title: str = page.locator(f"#{AMAZON_PRODUCT_TITLE_ID}").inner_text()
 
         # Get the features of the product
-        features: Any = self.browser.find_elements(By.ID, AMAZON_FEATURE_BULLETS_ID)
+        features: Any = page.locator(f"#{AMAZON_FEATURE_BULLETS_ID} li").all_inner_texts()
 
         if get_verbose():
             info(f"Product Title: {product_title}")
@@ -176,7 +147,4 @@ class AffiliateMarketing:
         This method will be used to quit the browser.
         """
         # Quit the browser
-        try:
-            self.browser.quit()
-        except Exception:
-            pass
+        close_browser_context(getattr(self, "playwright", None), getattr(self, "context", None))

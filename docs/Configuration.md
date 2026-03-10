@@ -5,7 +5,7 @@
 ## 주요 값
 
 - `verbose`: 상세 로그 출력 여부
-- `firefox_profile`: 업로드/게시용 Firefox 프로필 경로
+- `browser_profile`: 업로드/게시용 Chrome/Chromium user data dir
 - `headless`: 브라우저를 headless로 실행할지 여부
 - `ollama_base_url`: Ollama 서버 주소
 - `ollama_model`: 텍스트 생성에 사용할 Ollama 모델

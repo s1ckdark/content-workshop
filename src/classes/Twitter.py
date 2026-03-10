@@ -7,18 +7,11 @@ import json
 from cache import *
 from config import *
 from status import *
+from browser import close_browser_context, get_active_page, launch_persistent_chromium
 from llm_provider import generate_text
 from typing import List, Optional
 from datetime import datetime
 from termcolor import colored
-from selenium_firefox import *
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
-from webdriver_manager.firefox import GeckoDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 
 class Twitter:
@@ -35,7 +28,7 @@ class Twitter:
         Args:
             account_uuid (str): The account UUID
             account_nickname (str): The account nickname
-            fp_profile_path (str): The path to the Firefox profile
+            fp_profile_path (str): The path to the Chrome user data directory
 
         Returns:
             None
@@ -45,30 +38,7 @@ class Twitter:
         self.fp_profile_path: str = fp_profile_path
         self.topic: str = topic
 
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
-        if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {fp_profile_path}"
-            )
-
-        # Set the profile path
-        self.options.add_argument("-profile")
-        self.options.add_argument(fp_profile_path)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
-        self.wait: WebDriverWait = WebDriverWait(self.browser, 30)
+        self.playwright, self.context = launch_persistent_chromium(fp_profile_path)
 
     def post(self, text: Optional[str] = None) -> None:
         """
@@ -80,10 +50,10 @@ class Twitter:
         Returns:
             None
         """
-        bot: webdriver.Firefox = self.browser
         verbose: bool = get_verbose()
+        page = get_active_page(self.context)
 
-        bot.get("https://x.com/compose/post")
+        page.goto("https://x.com/compose/post", wait_until="domcontentloaded")
 
         post_content: str = text if text is not None else self.generate_post()
         now: datetime = datetime.now()
@@ -93,37 +63,41 @@ class Twitter:
 
         text_box = None
         text_box_selectors = [
-            (By.CSS_SELECTOR, "div[data-testid='tweetTextarea_0'][role='textbox']"),
-            (By.XPATH, "//div[@data-testid='tweetTextarea_0']//div[@role='textbox']"),
-            (By.XPATH, "//div[@role='textbox']"),
+            "css=div[data-testid='tweetTextarea_0'][role='textbox']",
+            "xpath=//div[@data-testid='tweetTextarea_0']//div[@role='textbox']",
+            "xpath=//div[@role='textbox']",
         ]
 
         for selector in text_box_selectors:
             try:
-                text_box = self.wait.until(EC.element_to_be_clickable(selector))
-                text_box.click()
-                text_box.send_keys(body)
+                candidate = page.locator(selector).first
+                candidate.wait_for(state="visible")
+                candidate.click()
+                page.keyboard.type(body)
+                text_box = candidate
                 break
             except Exception:
                 continue
 
         if text_box is None:
             raise RuntimeError(
-                "Could not find tweet text box. Ensure you are logged into X in this Firefox profile."
+                "Could not find tweet text box. Ensure you are logged into X in this Chrome profile."
             )
 
 
         post_button = None
         post_button_selectors = [
-            (By.XPATH, "//button[@data-testid='tweetButtonInline']"),
-            (By.XPATH, "//button[@data-testid='tweetButton']"),
-            (By.XPATH, "//span[text()='Post']/ancestor::button"),
+            "xpath=//button[@data-testid='tweetButtonInline']",
+            "xpath=//button[@data-testid='tweetButton']",
+            "xpath=//span[text()='Post']/ancestor::button",
         ]
 
         for selector in post_button_selectors:
             try:
-                post_button = self.wait.until(EC.element_to_be_clickable(selector))
-                post_button.click()
+                candidate = page.locator(selector).first
+                candidate.wait_for(state="visible")
+                candidate.click()
+                post_button = candidate
                 break
             except Exception:
                 continue
@@ -224,7 +198,4 @@ class Twitter:
         Returns:
             None
         """
-        try:
-            self.browser.quit()
-        except Exception:
-            pass
+        close_browser_context(getattr(self, "playwright", None), getattr(self, "context", None))

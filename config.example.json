@@ -1,6 +1,6 @@
 {
   "verbose": true,
-  "firefox_profile": "",
+  "browser_profile": "",
   "headless": false,
   "ollama_base_url": "http://127.0.0.1:11434",
   "ollama_model": "",

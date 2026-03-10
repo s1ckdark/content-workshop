@@ -9,6 +9,20 @@ from classes.Twitter import Twitter
 from classes.YouTube import YouTube
 from llm_provider import select_model
 
+
+def get_account_browser_profile(account: dict) -> str:
+    """
+    Returns the browser profile path with legacy Firefox fallback.
+
+    Args:
+        account (dict): Account payload
+
+    Returns:
+        path (str): Browser profile path
+    """
+    return account.get("browser_profile") or account.get("firefox_profile", "")
+
+
 def main():
     """Main function to post content to Twitter or upload videos to YouTube.
 
@@ -52,7 +66,7 @@ def main():
                 twitter = Twitter(
                     acc["id"],
                     acc["nickname"],
-                    acc["firefox_profile"],
+                    get_account_browser_profile(acc),
                     acc["topic"]
                 )
                 twitter.post()
@@ -74,7 +88,7 @@ def main():
                 youtube = YouTube(
                     acc["id"],
                     acc["nickname"],
-                    acc["firefox_profile"],
+                    get_account_browser_profile(acc),
                     acc["niche"],
                     acc["language"]
                 )

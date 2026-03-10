@@ -54,14 +54,14 @@ def main() -> int:
             "MoviePy subtitle rendering may fail."
         )
 
-    firefox_profile = cfg.get("firefox_profile", "")
-    if firefox_profile:
-        if os.path.isdir(firefox_profile):
-            ok(f"firefox_profile exists: {firefox_profile}")
+    browser_profile = cfg.get("browser_profile") or cfg.get("firefox_profile", "")
+    if browser_profile:
+        if os.path.isdir(browser_profile):
+            ok(f"browser_profile exists: {browser_profile}")
         else:
-            warn(f"firefox_profile does not exist: {firefox_profile}")
+            warn(f"browser_profile does not exist: {browser_profile}")
     else:
-        warn("firefox_profile is empty. Twitter/YouTube automation requires this.")
+        warn("browser_profile is empty. Twitter/YouTube automation requires this.")
 
     # Ollama (LLM)
     base = str(cfg.get("ollama_base_url", "http://127.0.0.1:11434")).rstrip("/")
