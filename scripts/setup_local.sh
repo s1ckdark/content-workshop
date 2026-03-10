@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT_DIR"
 
 echo "[setup] Root: $ROOT_DIR"
@@ -11,10 +11,33 @@ if [[ ! -f "config.json" ]]; then
   echo "[setup] Created config.json from config.example.json"
 fi
 
+if [[ -x "$HOME/.asdf/installs/python/3.12.12/bin/python3.12" ]]; then
+  SYSTEM_PYTHON="$HOME/.asdf/installs/python/3.12.12/bin/python3.12"
+elif command -v python3.12 >/dev/null 2>&1; then
+  SYSTEM_PYTHON="$(command -v python3.12)"
+elif command -v python3 >/dev/null 2>&1; then
+  SYSTEM_PYTHON="$(command -v python3)"
+else
+  echo "[setup] Python 3.12 is required but no usable python interpreter was found."
+  exit 1
+fi
+
+SYSTEM_PYTHON_VERSION="$("$SYSTEM_PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+if [[ "$SYSTEM_PYTHON_VERSION" != "3.12" ]]; then
+  echo "[setup] Python 3.12 is required. Found: $SYSTEM_PYTHON_VERSION ($SYSTEM_PYTHON)"
+  exit 1
+fi
+
 PYTHON_BIN="${ROOT_DIR}/venv/bin/python"
 if [[ ! -x "$PYTHON_BIN" ]]; then
-  python3 -m venv venv
+  "$SYSTEM_PYTHON" -m venv venv
   echo "[setup] Created virtual environment at venv/"
+else
+  VENV_PYTHON_VERSION="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+  if [[ "$VENV_PYTHON_VERSION" != "3.12" ]]; then
+    echo "[setup] Existing venv uses Python $VENV_PYTHON_VERSION. Recreate venv with Python 3.12."
+    exit 1
+  fi
 fi
 
 "$PYTHON_BIN" -m ensurepip --upgrade >/dev/null 2>&1 || true
@@ -47,14 +70,16 @@ cfg_path = os.path.join(ROOT_DIR, "config.json")
 with open(cfg_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
-# Set defaults per service without overriding explicit user choices.
-cfg.setdefault("llm_provider", "local_ollama")
-cfg.setdefault("image_provider", "local_automatic1111")
 cfg.setdefault("stt_provider", "local_whisper")
-
 cfg.setdefault("ollama_base_url", "http://127.0.0.1:11434")
-cfg.setdefault("automatic1111_base_url", "http://127.0.0.1:7860")
-cfg.setdefault("cloudflare_worker_url", "")
+cfg.setdefault("ollama_model", "")
+cfg.setdefault(
+    "nanobanana2_api_base_url",
+    "https://generativelanguage.googleapis.com/v1beta",
+)
+cfg.setdefault("nanobanana2_api_key", "")
+cfg.setdefault("nanobanana2_model", "gemini-3.1-flash-image-preview")
+cfg.setdefault("nanobanana2_aspect_ratio", "9:16")
 cfg.setdefault("whisper_model", "base")
 cfg.setdefault("whisper_device", "auto")
 cfg.setdefault("whisper_compute_type", "int8")
@@ -106,8 +131,8 @@ with open(cfg_path, "w", encoding="utf-8") as f:
     f.write("\n")
 
 print(f"[setup] Updated {cfg_path}")
-print(f"[setup] llm_provider={cfg.get('llm_provider')} model={cfg.get('ollama_model')}")
-print(f"[setup] image_provider={cfg.get('image_provider')}")
+print(f"[setup] ollama_model={cfg.get('ollama_model')}")
+print(f"[setup] nanobanana2_model={cfg.get('nanobanana2_model')}")
 print(f"[setup] stt_provider={cfg.get('stt_provider')}")
 PY
 

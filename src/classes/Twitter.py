@@ -23,14 +23,14 @@ from selenium.webdriver.support import expected_conditions as EC
 
 class Twitter:
     """
-    Class for the Bot, that grows a Twitter account.
+    Automates content generation and posting for a Twitter/X account.
     """
 
     def __init__(
         self, account_uuid: str, account_nickname: str, fp_profile_path: str, topic: str
     ) -> None:
         """
-        Initializes the Twitter Bot.
+        Initializes the Twitter/X automation client.
 
         Args:
             account_uuid (str): The account UUID
@@ -72,7 +72,7 @@ class Twitter:
 
     def post(self, text: Optional[str] = None) -> None:
         """
-        Starts the Twitter Bot.
+        Publishes content to Twitter/X.
 
         Args:
             text (str): The text to post
@@ -148,9 +148,7 @@ class Twitter:
             posts (List[dict]): The posts
         """
         if not os.path.exists(get_twitter_cache_path()):
-            # Create the cache file
-            with open(get_twitter_cache_path(), "w") as file:
-                json.dump({"accounts": []}, file, indent=4)
+            write_json_atomic(get_twitter_cache_path(), {"accounts": []})
 
         with open(get_twitter_cache_path(), "r") as file:
             parsed = json.load(file)
@@ -179,9 +177,6 @@ class Twitter:
         Returns:
             None
         """
-        posts = self.get_posts()
-        posts.append(post)
-
         with open(get_twitter_cache_path(), "r") as file:
             previous_json = json.loads(file.read())
 
@@ -191,9 +186,7 @@ class Twitter:
                 if account["id"] == self.account_uuid:
                     account["posts"].append(post)
 
-            # Commit changes
-            with open(get_twitter_cache_path(), "w") as f:
-                f.write(json.dumps(previous_json))
+            write_json_atomic(get_twitter_cache_path(), previous_json)
 
     def generate_post(self) -> str:
         """
@@ -223,3 +216,15 @@ class Twitter:
             return completion[:257].rsplit(" ", 1)[0] + "..."
 
         return completion
+
+    def close(self) -> None:
+        """
+        Closes the browser session safely.
+
+        Returns:
+            None
+        """
+        try:
+            self.browser.quit()
+        except Exception:
+            pass

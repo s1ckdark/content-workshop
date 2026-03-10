@@ -1,24 +1,26 @@
-# AFM
+# Affiliate Campaigns
 
-This class is responsible for the Affiliate Marketing part of MPV2. It uses Ollama (as all other classes) as its way to utilize the power of LLMs, in this case, to generate tweets, based on information about an **Amazon Product**. MPV2 will scrape the page of the product, and save the **product title**, and **product features**, thus having enough information to be able to create a pitch for the product, and post it on Twitter.
+이 기능은 Amazon 상품 페이지를 읽고, 제품 정보 기반 홍보 문구를 만든 뒤 Twitter/X에 게시하는 흐름입니다.
 
-## Relevant Configuration
+## 동작 방식
 
-In your `config.json`, you need the following attributes filled out, so that the bot can function correctly.
+1. 제휴 링크로 상품 페이지 접속
+2. 제목과 핵심 특징 수집
+3. Ollama로 짧은 홍보 문구 생성
+4. 링크를 붙여 Twitter/X에 게시
+
+## 필요한 설정
 
 ```json
 {
-  "firefox_profile": "The path to your Firefox profile (used to log in to Twitter)",
+  "firefox_profile": "/path/to/firefox/profile",
   "headless": true,
   "ollama_base_url": "http://127.0.0.1:11434",
-  "threads": 4
+  "ollama_model": "llama3.2:3b"
 }
 ```
 
-## Roadmap
+## 주의할 점
 
-Here are some features that are planned for the future:
-
-- [ ] Scrape more information about the product, to be able to create a more detailed pitch.
-- [ ] Join online communities related to the product, and post a pitch (with a link to the product) there.
-- [ ] Reply to tweets that are related to the product, with a pitch for the product.
+- 연결된 Twitter 계정 UUID가 유효해야 합니다.
+- Amazon 페이지 구조가 바뀌면 선택자 수정이 필요할 수 있습니다.

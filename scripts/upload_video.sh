@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to generate & Upload a video to YT Shorts
+# Script to generate and upload a YouTube Short
 
 # Check which interpreter to use (python)
 if [ -x "$(command -v python3)" ]; then
@@ -30,5 +30,13 @@ else
   exit 1
 fi
 
+# Resolve model from config.json so cron.py can run without extra prompts
+model=$($PYTHON -c "import json; print(json.load(open('config.json')).get('ollama_model', ''))")
+
+if [[ -z "$model" ]]; then
+  echo "No ollama_model configured in config.json"
+  exit 1
+fi
+
 # Run python script
-$PYTHON src/cron.py youtube $id
+$PYTHON src/cron.py youtube $id $model

@@ -6,18 +6,18 @@ TWITTER_TEXTAREA_CLASS = "public-DraftStyleDefault-block public-DraftStyleDefaul
 TWITTER_POST_BUTTON_XPATH = "/html/body/div[1]/div/div/div[2]/main/div/div/div/div[1]/div/div[3]/div/div[2]/div[1]/div/div/div/div[2]/div[2]/div[2]/div/div/div/div[3]"
 
 OPTIONS = [
-    "YouTube Shorts Automation",
-    "Twitter Bot",
-    "Affiliate Marketing",
+    "YouTube Shorts Studio",
+    "Twitter/X Automation",
+    "Affiliate Campaigns",
     "Outreach",
     "Quit"
 ]
 
 TWITTER_OPTIONS = [
-    "Post something",
-    "Show all Posts",
-    "Setup CRON Job",
-    "Quit"
+    "Post Content",
+    "Show Post History",
+    "Run Scheduler",
+    "Back"
 ]
 
 TWITTER_CRON_OPTIONS = [
@@ -28,10 +28,10 @@ TWITTER_CRON_OPTIONS = [
 ]
 
 YOUTUBE_OPTIONS = [
-    "Upload Short",
-    "Show all Shorts",
-    "Setup CRON Job",
-    "Quit"
+    "Create Short",
+    "Show Generated Shorts",
+    "Run Scheduler",
+    "Back"
 ]
 
 YOUTUBE_CRON_OPTIONS = [

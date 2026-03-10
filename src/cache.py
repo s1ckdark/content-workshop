@@ -1,5 +1,6 @@
-import os
 import json
+import os
+import tempfile
 
 from typing import List
 from config import ROOT_DIR
@@ -12,6 +13,32 @@ def get_cache_path() -> str:
         path (str): The path to the cache folder
     """
     return os.path.join(ROOT_DIR, '.mp')
+
+
+def write_json_atomic(path: str, payload: dict) -> None:
+    """
+    Writes JSON atomically to avoid partial files on interruption.
+
+    Args:
+        path (str): Destination path
+        payload (dict): JSON-serializable object
+
+    Returns:
+        None
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=4)
+            file.flush()
+            os.fsync(file.fileno())
+
+        os.replace(temp_path, path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 def get_afm_cache_path() -> str:
     """
@@ -73,11 +100,7 @@ def get_accounts(provider: str) -> List[dict]:
     cache_path = get_provider_cache_path(provider)
 
     if not os.path.exists(cache_path):
-        # Create the cache file
-        with open(cache_path, 'w') as file:
-            json.dump({
-                "accounts": []
-            }, file, indent=4)
+        write_json_atomic(cache_path, {"accounts": []})
 
     with open(cache_path, 'r') as file:
         parsed = json.load(file)
@@ -111,10 +134,7 @@ def add_account(provider: str, account: dict) -> None:
     accounts.append(account)
 
     # Write the new accounts to the cache
-    with open(cache_path, 'w') as file:
-        json.dump({
-            "accounts": accounts
-        }, file, indent=4)
+    write_json_atomic(cache_path, {"accounts": accounts})
 
 def remove_account(provider: str, account_id: str) -> None:
     """
@@ -136,10 +156,7 @@ def remove_account(provider: str, account_id: str) -> None:
     # Write the new accounts to the cache
     cache_path = get_provider_cache_path(provider)
 
-    with open(cache_path, 'w') as file:
-        json.dump({
-            "accounts": accounts
-        }, file, indent=4)
+    write_json_atomic(cache_path, {"accounts": accounts})
 
 def get_products() -> List[dict]:
     """
@@ -149,11 +166,7 @@ def get_products() -> List[dict]:
         products (List[dict]): The products
     """
     if not os.path.exists(get_afm_cache_path()):
-        # Create the cache file
-        with open(get_afm_cache_path(), 'w') as file:
-            json.dump({
-                "products": []
-            }, file, indent=4)
+        write_json_atomic(get_afm_cache_path(), {"products": []})
 
     with open(get_afm_cache_path(), 'r') as file:
         parsed = json.load(file)
@@ -178,10 +191,7 @@ def add_product(product: dict) -> None:
     products.append(product)
 
     # Write the new products to the cache
-    with open(get_afm_cache_path(), 'w') as file:
-        json.dump({
-            "products": products
-        }, file, indent=4)
+    write_json_atomic(get_afm_cache_path(), {"products": products})
     
 def get_results_cache_path() -> str:
     """

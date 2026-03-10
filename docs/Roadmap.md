@@ -1,18 +1,21 @@
-# MPV2 Roadmap
+# 컨텐츠제작소 로드맵
 
-This document outlines the features that need to be implemented in MPV2.
+## 안정화
 
-## Features
+- [ ] Selenium 업로드/게시 실패 로그 개선
+- [ ] JSON 캐시 쓰기를 원자적으로 전환
+- [ ] 스케줄러 설정 저장 기능 추가
+- [ ] YouTube 업로드 선택자 안정화
 
-- [ ] Automated Cold Calling
-- [ ] Item Flipping (such as sneakers)
-- [ ] Create a Short based on long-form content
-- [ ] Subtitles for Shorts
+## 제작 기능
 
-## Adding a new feature
+- [ ] 긴 영상에서 Shorts 클립 생성
+- [ ] 템플릿 기반 자막 스타일링
+- [ ] 멀티 계정 콘텐츠 캘린더
+- [ ] 배경음악과 템플릿 프리셋 관리
 
-If you want to add a new feature to MPV2, please create a new issue and label it with `enhancement`. After that, create a new branch and start working on the feature. Once you are done, create a pull request and assign it to the issue you created earlier.
+## 운영 기능
 
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+- [ ] 작업 이력 대시보드
+- [ ] 실패 재시도 큐
+- [ ] 환경 점검 자동 수정 스크립트

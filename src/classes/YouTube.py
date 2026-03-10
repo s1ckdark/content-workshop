@@ -423,9 +423,6 @@ class YouTube:
         Returns:
             None
         """
-        videos = self.get_videos()
-        videos.append(video)
-
         cache = get_youtube_cache_path()
 
         with open(cache, "r") as file:
@@ -437,9 +434,7 @@ class YouTube:
                 if account["id"] == self._account_uuid:
                     account["videos"].append(video)
 
-            # Commit changes
-            with open(cache, "w") as f:
-                f.write(json.dumps(previous_json))
+            write_json_atomic(cache, previous_json)
 
     def generate_subtitles(self, audio_path: str) -> str:
         """
@@ -672,6 +667,11 @@ class YouTube:
         for prompt in self.image_prompts:
             self.generate_image(prompt)
 
+        if len(self.images) == 0:
+            raise RuntimeError(
+                "No images were generated. Check your Nano Banana 2 configuration."
+            )
+
         # Generate the TTS
         self.generate_script_to_speech(tts_instance)
 
@@ -848,7 +848,8 @@ class YouTube:
             driver.quit()
 
             return True
-        except:
+        except Exception as exc:
+            error(f"Failed to upload video: {exc}")
             self.browser.quit()
             return False
 
@@ -861,8 +862,7 @@ class YouTube:
         """
         if not os.path.exists(get_youtube_cache_path()):
             # Create the cache file
-            with open(get_youtube_cache_path(), "w") as file:
-                json.dump({"videos": []}, file, indent=4)
+            write_json_atomic(get_youtube_cache_path(), {"accounts": []})
             return []
 
         videos = []
@@ -870,9 +870,21 @@ class YouTube:
         with open(get_youtube_cache_path(), "r") as file:
             previous_json = json.loads(file.read())
             # Find our account
-            accounts = previous_json["accounts"]
+            accounts = previous_json.get("accounts", [])
             for account in accounts:
                 if account["id"] == self._account_uuid:
                     videos = account["videos"]
 
         return videos
+
+    def close(self) -> None:
+        """
+        Closes the browser session safely.
+
+        Returns:
+            None
+        """
+        try:
+            self.browser.quit()
+        except Exception:
+            pass

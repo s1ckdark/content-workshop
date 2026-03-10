@@ -1,5 +1,8 @@
+import os
 import schedule
 import subprocess
+import sys
+import time
 
 from art import *
 from cache import *
@@ -17,16 +20,124 @@ from classes.Outreach import Outreach
 from classes.AFM import AffiliateMarketing
 from llm_provider import list_models, select_model, get_active_model
 
+
+def ensure_model_selected() -> str | None:
+    """
+    Ensures an Ollama model is selected before LLM-backed workflows run.
+
+    Returns:
+        model (str | None): Selected model, or None when selection failed.
+    """
+    active_model = get_active_model()
+    if active_model:
+        return active_model
+
+    configured_model = get_ollama_model()
+    if configured_model:
+        select_model(configured_model)
+        success(f"Using configured model: {configured_model}")
+        return configured_model
+
+    try:
+        models = list_models()
+    except Exception as e:
+        error(f"Could not connect to Ollama: {e}")
+        return None
+
+    if not models:
+        error("No models found on Ollama. Pull a model first (e.g. 'ollama pull llama3.2:3b').")
+        return None
+
+    info("\n========== OLLAMA MODELS =========", False)
+    for idx, model_name in enumerate(models):
+        print(colored(f" {idx + 1}. {model_name}", "cyan"))
+    info("==================================\n", False)
+
+    selected_model = None
+    while selected_model is None:
+        raw = input(colored("Select a model: ", "magenta")).strip()
+        try:
+            choice_idx = int(raw) - 1
+            if 0 <= choice_idx < len(models):
+                selected_model = models[choice_idx]
+            else:
+                warning("Invalid selection. Try again.")
+        except ValueError:
+            warning("Please enter a number.")
+
+    select_model(selected_model)
+    success(f"Using model: {selected_model}")
+    return selected_model
+
+
+def ensure_song_library() -> bool:
+    """
+    Ensures the Songs directory contains at least one usable audio file.
+
+    Returns:
+        ready (bool): True when audio files are available.
+    """
+    fetch_songs()
+
+    songs_dir = os.path.join(ROOT_DIR, "Songs")
+    if not os.path.isdir(songs_dir):
+        error("Songs directory is missing. Configure zip_url or place audio files in Songs/.")
+        return False
+
+    supported_extensions = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
+    has_audio = any(
+        os.path.isfile(os.path.join(songs_dir, name))
+        and name.lower().endswith(supported_extensions)
+        for name in os.listdir(songs_dir)
+    )
+
+    if not has_audio:
+        error("No songs are available. Add audio files to Songs/ or configure zip_url.")
+        return False
+
+    return True
+
+
+def run_scheduler(command: list[str], scheduler_options: list[str], label: str) -> None:
+    """
+    Runs the selected schedule in the foreground until interrupted.
+
+    Args:
+        command (list[str]): Command to run
+        scheduler_options (list[str]): Times to execute each day
+        label (str): Label for logs
+
+    Returns:
+        None
+    """
+    scheduler = schedule.Scheduler()
+
+    def job():
+        subprocess.run(command, check=False)
+
+    for schedule_time in scheduler_options:
+        scheduler.every().day.at(schedule_time).do(job)
+
+    success(f"{label} scheduler started. Keep this process running. Press Ctrl+C to stop.")
+
+    try:
+        while True:
+            scheduler.run_pending()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        warning(f"{label} scheduler stopped.", False)
+
+
 def main():
     """Main entry point for the application, providing a menu-driven interface
-    to manage YouTube, Twitter bots, Affiliate Marketing, and Outreach tasks.
+    to manage YouTube, Twitter, Affiliate Campaigns, and Outreach tasks.
 
     This function allows users to:
-    1. Start the YouTube Shorts Automater to manage YouTube accounts, 
-       generate and upload videos, and set up CRON jobs.
-    2. Start a Twitter Bot to manage Twitter accounts, post tweets, and 
-       schedule posts using CRON jobs.
-    3. Manage Affiliate Marketing by creating pitches and sharing them via 
+    1. Start the YouTube Shorts Studio to manage YouTube accounts,
+       generate and upload videos, and run scheduled jobs.
+    2. Start Twitter/X automation to manage accounts, post tweets, and
+       run scheduled jobs.
+    3. Manage affiliate campaigns by creating pitches and sharing them via
        Twitter accounts.
     4. Initiate an Outreach process for engagement and promotion tasks.
     5. Exit the application.
@@ -65,7 +176,7 @@ def main():
 
     # Start the selected option
     if user_input == 1:
-        info("Starting YT Shorts Automater...")
+        info("Starting YouTube Shorts Studio...")
 
         cached_accounts = get_accounts("youtube")
 
@@ -136,7 +247,7 @@ def main():
 
             if selected_account is None:
                 error("Invalid account selected. Please try again.", "red")
-                main()
+                return
             else:
                 youtube = YouTube(
                     selected_account["id"],
@@ -146,75 +257,83 @@ def main():
                     selected_account["language"]
                 )
 
-                while True:
-                    rem_temp_files()
-                    info("\n============ OPTIONS ============", False)
-
-                    for idx, youtube_option in enumerate(YOUTUBE_OPTIONS):
-                        print(colored(f" {idx + 1}. {youtube_option}", "cyan"))
-
-                    info("=================================\n", False)
-
-                    # Get user input
-                    user_input = int(question("Select an option: "))
-                    tts = TTS()
-
-                    if user_input == 1:
-                        youtube.generate_video(tts)
-                        upload_to_yt = question("Do you want to upload this video to YouTube? (Yes/No): ")
-                        if upload_to_yt.lower() == "yes":
-                            youtube.upload_video()
-                    elif user_input == 2:
-                        videos = youtube.get_videos()
-
-                        if len(videos) > 0:
-                            videos_table = PrettyTable()
-                            videos_table.field_names = ["ID", "Date", "Title"]
-
-                            for video in videos:
-                                videos_table.add_row([
-                                    videos.index(video) + 1,
-                                    colored(video["date"], "blue"),
-                                    colored(video["title"][:60] + "...", "green")
-                                ])
-
-                            print(videos_table)
-                        else:
-                            warning(" No videos found.")
-                    elif user_input == 3:
-                        info("How often do you want to upload?")
-
+                try:
+                    while True:
+                        rem_temp_files()
                         info("\n============ OPTIONS ============", False)
-                        for idx, cron_option in enumerate(YOUTUBE_CRON_OPTIONS):
-                            print(colored(f" {idx + 1}. {cron_option}", "cyan"))
+
+                        for idx, youtube_option in enumerate(YOUTUBE_OPTIONS):
+                            print(colored(f" {idx + 1}. {youtube_option}", "cyan"))
 
                         info("=================================\n", False)
 
-                        user_input = int(question("Select an Option: "))
-
-                        cron_script_path = os.path.join(ROOT_DIR, "src", "cron.py")
-                        command = ["python", cron_script_path, "youtube", selected_account['id'], get_active_model()]
-
-                        def job():
-                            subprocess.run(command)
+                        # Get user input
+                        user_input = int(question("Select an option: "))
 
                         if user_input == 1:
-                            # Upload Once
-                            schedule.every(1).day.do(job)
-                            success("Set up CRON Job.")
+                            if ensure_model_selected() is None:
+                                continue
+                            if not ensure_song_library():
+                                continue
+                            tts = TTS()
+                            youtube.generate_video(tts)
+                            upload_to_yt = question("Do you want to upload this video to YouTube? (Yes/No): ")
+                            if upload_to_yt.lower() == "yes":
+                                youtube.upload_video()
                         elif user_input == 2:
-                            # Upload Twice a day
-                            schedule.every().day.at("10:00").do(job)
-                            schedule.every().day.at("16:00").do(job)
-                            success("Set up CRON Job.")
-                        else:
+                            videos = youtube.get_videos()
+
+                            if len(videos) > 0:
+                                videos_table = PrettyTable()
+                                videos_table.field_names = ["ID", "Date", "Title"]
+
+                                for video in videos:
+                                    videos_table.add_row([
+                                        videos.index(video) + 1,
+                                        colored(video["date"], "blue"),
+                                        colored(video["title"][:60] + "...", "green")
+                                    ])
+
+                                print(videos_table)
+                            else:
+                                warning(" No videos found.")
+                        elif user_input == 3:
+                            info("How often do you want to upload?")
+
+                            info("\n============ OPTIONS ============", False)
+                            for idx, cron_option in enumerate(YOUTUBE_CRON_OPTIONS):
+                                print(colored(f" {idx + 1}. {cron_option}", "cyan"))
+
+                            info("=================================\n", False)
+
+                            user_input = int(question("Select an Option: "))
+
+                            if ensure_model_selected() is None:
+                                continue
+                            if not ensure_song_library():
+                                continue
+
+                            cron_script_path = os.path.join(ROOT_DIR, "src", "cron.py")
+                            command = [sys.executable, cron_script_path, "youtube", selected_account['id'], get_active_model()]
+
+                            if user_input == 1:
+                                run_scheduler(command, ["10:00"], "YouTube")
+                            elif user_input == 2:
+                                run_scheduler(command, ["10:00", "16:00"], "YouTube")
+                            elif user_input == 3:
+                                run_scheduler(command, ["08:00", "12:00", "18:00"], "YouTube")
+                            else:
+                                break
+                        elif user_input == 4:
+                            if get_verbose():
+                                info(" => Climbing Options Ladder...", False)
                             break
-                    elif user_input == 4:
-                        if get_verbose():
-                            info(" => Climbing Options Ladder...", False)
-                        break
+                        else:
+                            warning("Invalid option selected. Please try again.", False)
+                finally:
+                    youtube.close()
     elif user_input == 2:
-        info("Starting Twitter Bot...")
+        info("Starting Twitter/X Automation...")
 
         cached_accounts = get_accounts("twitter")
 
@@ -279,79 +398,77 @@ def main():
 
             if selected_account is None:
                 error("Invalid account selected. Please try again.", "red")
-                main()
+                return
             else:
                 twitter = Twitter(selected_account["id"], selected_account["nickname"], selected_account["firefox_profile"], selected_account["topic"])
 
-                while True:
-                    
-                    info("\n============ OPTIONS ============", False)
-
-                    for idx, twitter_option in enumerate(TWITTER_OPTIONS):
-                        print(colored(f" {idx + 1}. {twitter_option}", "cyan"))
-
-                    info("=================================\n", False)
-
-                    # Get user input
-                    user_input = int(question("Select an option: "))
-
-                    if user_input == 1:
-                        twitter.post()
-                    elif user_input == 2:
-                        posts = twitter.get_posts()
-
-                        posts_table = PrettyTable()
-
-                        posts_table.field_names = ["ID", "Date", "Content"]
-
-                        for post in posts:
-                            posts_table.add_row([
-                                posts.index(post) + 1,
-                                colored(post["date"], "blue"),
-                                colored(post["content"][:60] + "...", "green")
-                            ])
-
-                        print(posts_table)
-                    elif user_input == 3:
-                        info("How often do you want to post?")
-
+                try:
+                    while True:
+                        
                         info("\n============ OPTIONS ============", False)
-                        for idx, cron_option in enumerate(TWITTER_CRON_OPTIONS):
-                            print(colored(f" {idx + 1}. {cron_option}", "cyan"))
+
+                        for idx, twitter_option in enumerate(TWITTER_OPTIONS):
+                            print(colored(f" {idx + 1}. {twitter_option}", "cyan"))
 
                         info("=================================\n", False)
 
-                        user_input = int(question("Select an Option: "))
-
-                        cron_script_path = os.path.join(ROOT_DIR, "src", "cron.py")
-                        command = ["python", cron_script_path, "twitter", selected_account['id'], get_active_model()]
-
-                        def job():
-                            subprocess.run(command)
+                        # Get user input
+                        user_input = int(question("Select an option: "))
 
                         if user_input == 1:
-                            # Post Once a day
-                            schedule.every(1).day.do(job)
-                            success("Set up CRON Job.")
+                            if ensure_model_selected() is None:
+                                continue
+                            twitter.post()
                         elif user_input == 2:
-                            # Post twice a day
-                            schedule.every().day.at("10:00").do(job)
-                            schedule.every().day.at("16:00").do(job)
-                            success("Set up CRON Job.")
+                            posts = twitter.get_posts()
+
+                            posts_table = PrettyTable()
+
+                            posts_table.field_names = ["ID", "Date", "Content"]
+
+                            for post in posts:
+                                posts_table.add_row([
+                                    posts.index(post) + 1,
+                                    colored(post["date"], "blue"),
+                                    colored(post["content"][:60] + "...", "green")
+                                ])
+
+                            print(posts_table)
                         elif user_input == 3:
-                            # Post thrice a day
-                            schedule.every().day.at("08:00").do(job)
-                            schedule.every().day.at("12:00").do(job)
-                            schedule.every().day.at("18:00").do(job)
-                            success("Set up CRON Job.")
-                        else:
+                            info("How often do you want to post?")
+
+                            info("\n============ OPTIONS ============", False)
+                            for idx, cron_option in enumerate(TWITTER_CRON_OPTIONS):
+                                print(colored(f" {idx + 1}. {cron_option}", "cyan"))
+
+                            info("=================================\n", False)
+
+                            user_input = int(question("Select an Option: "))
+
+                            if ensure_model_selected() is None:
+                                continue
+
+                            cron_script_path = os.path.join(ROOT_DIR, "src", "cron.py")
+                            command = [sys.executable, cron_script_path, "twitter", selected_account['id'], get_active_model()]
+
+                            if user_input == 1:
+                                run_scheduler(command, ["10:00"], "Twitter")
+                            elif user_input == 2:
+                                run_scheduler(command, ["10:00", "16:00"], "Twitter")
+                            elif user_input == 3:
+                                run_scheduler(command, ["08:00", "12:00", "18:00"], "Twitter")
+                            else:
+                                break
+                        elif user_input == 4:
+                            if get_verbose():
+                                info(" => Climbing Options Ladder...", False)
                             break
-                    elif user_input == 4:
-                        if get_verbose():
-                            info(" => Climbing Options Ladder...", False)
-                        break
+                        else:
+                            warning("Invalid option selected. Please try again.", False)
+                finally:
+                    twitter.close()
     elif user_input == 3:
-        info("Starting Affiliate Marketing...")
+        info("Starting Affiliate Campaigns...")
 
         cached_products = get_products()
 
@@ -369,6 +486,13 @@ def main():
                     if acc["id"] == twitter_uuid:
                         account = acc
 
+                if ensure_model_selected() is None:
+                    return
+
+                if account is None:
+                    error("Twitter account UUID not found. Create or select a valid account first.")
+                    return
+
                 add_product({
                     "id": str(uuid4()),
                     "affiliate_link": affiliate_link,
@@ -377,8 +501,11 @@ def main():
 
                 afm = AffiliateMarketing(affiliate_link, account["firefox_profile"], account["id"], account["nickname"], account["topic"])
 
-                afm.generate_pitch()
-                afm.share_pitch("twitter")
+                try:
+                    afm.generate_pitch()
+                    afm.share_pitch("twitter")
+                finally:
+                    afm.quit()
         else:
             table = PrettyTable()
             table.field_names = ["ID", "Affiliate Link", "Twitter Account UUID"]
@@ -398,7 +525,7 @@ def main():
 
             if selected_product is None:
                 error("Invalid product selected. Please try again.", "red")
-                main()
+                return
             else:
                 # Find the account
                 account = None
@@ -406,10 +533,20 @@ def main():
                     if acc["id"] == selected_product["twitter_uuid"]:
                         account = acc
 
+                if ensure_model_selected() is None:
+                    return
+
+                if account is None:
+                    error("Twitter account linked to this product no longer exists.")
+                    return
+
                 afm = AffiliateMarketing(selected_product["affiliate_link"], account["firefox_profile"], account["id"], account["nickname"], account["topic"])
 
-                afm.generate_pitch()
-                afm.share_pitch("twitter")
+                try:
+                    afm.generate_pitch()
+                    afm.share_pitch("twitter")
+                finally:
+                    afm.quit()
 
     elif user_input == 4:
         info("Starting Outreach...")
@@ -423,7 +560,7 @@ def main():
         sys.exit(0)
     else:
         error("Invalid option selected. Please try again.", "red")
-        main()
+        return
     
 
 if __name__ == "__main__":
@@ -433,52 +570,13 @@ if __name__ == "__main__":
     first_time = get_first_time_running()
 
     if first_time:
-        print(colored("Hey! It looks like you're running MoneyPrinter V2 for the first time. Let's get you setup first!", "yellow"))
+        print(colored("컨텐츠제작소를 처음 실행하는 것 같습니다. 작업 환경부터 준비하겠습니다.", "yellow"))
 
     # Setup file tree
     assert_folder_structure()
 
     # Remove temporary files
     rem_temp_files()
-
-    # Fetch MP3 Files
-    fetch_songs()
-
-    # Select Ollama model — use config value if set, otherwise pick interactively
-    configured_model = get_ollama_model()
-    if configured_model:
-        select_model(configured_model)
-        success(f"Using configured model: {configured_model}")
-    else:
-        try:
-            models = list_models()
-        except Exception as e:
-            error(f"Could not connect to Ollama: {e}")
-            sys.exit(1)
-
-        if not models:
-            error("No models found on Ollama. Pull a model first (e.g. 'ollama pull llama3.2:3b').")
-            sys.exit(1)
-
-        info("\n========== OLLAMA MODELS =========", False)
-        for idx, model_name in enumerate(models):
-            print(colored(f" {idx + 1}. {model_name}", "cyan"))
-        info("==================================\n", False)
-
-        model_choice = None
-        while model_choice is None:
-            raw = input(colored("Select a model: ", "magenta")).strip()
-            try:
-                choice_idx = int(raw) - 1
-                if 0 <= choice_idx < len(models):
-                    model_choice = models[choice_idx]
-                else:
-                    warning("Invalid selection. Try again.")
-            except ValueError:
-                warning("Please enter a number.")
-
-        select_model(model_choice)
-        success(f"Using model: {model_choice}")
 
     while True:
         main()

@@ -17,7 +17,7 @@ from webdriver_manager.firefox import GeckoDriverManager
 
 class AffiliateMarketing:
     """
-    This class will be used to handle all the affiliate marketing related operations.
+    Handles affiliate campaign workflows based on product pages and social posting.
     """
 
     def __init__(
@@ -29,7 +29,7 @@ class AffiliateMarketing:
         topic: str,
     ) -> None:
         """
-        Initializes the Affiliate Marketing class.
+        Initializes the affiliate campaign workflow.
 
         Args:
             affiliate_link (str): The affiliate link
@@ -166,11 +166,17 @@ class AffiliateMarketing:
             )
 
             # Share the pitch
-            twitter.post(self.pitch)
+            try:
+                twitter.post(self.pitch)
+            finally:
+                twitter.close()
 
     def quit(self) -> None:
         """
         This method will be used to quit the browser.
         """
         # Quit the browser
-        self.browser.quit()
+        try:
+            self.browser.quit()
+        except Exception:
+            pass

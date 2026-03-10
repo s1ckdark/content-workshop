@@ -1,26 +1,37 @@
-# YouTube Shorts Automater
+# YouTube Shorts Studio
 
-MPV2 uses a similar implementation of V1 (see [MPV1](https://github.com/FujiwaraChoki/MoneyPrinter)), to generate Video-Files and upload them to YouTube Shorts.
+이 문서는 `컨텐츠제작소`의 YouTube Shorts 생성 파이프라인을 설명합니다.
 
-In contrast to V1, V2 uses AI generated images as the visuals for the video, instead of using stock footage. This makes the videos more unique and less likely to be flagged by YouTube. V2 also supports music right from the get-go.
+## 동작 방식
 
-## Relevant Configuration
+YouTube 기능은 아래 구성으로 이어집니다.
 
-In your `config.json`, you need the following attributes filled out, so that the bot can function correctly.
+1. Ollama로 아이디어 생성
+2. 짧은 스크립트 생성
+3. 제목과 설명 생성
+4. 이미지 프롬프트 생성
+5. Gemini 이미지 API로 장면 이미지 생성
+6. KittenTTS로 음성 생성
+7. faster-whisper 또는 AssemblyAI로 자막 생성
+8. MoviePy로 세로 영상 합성
+9. Firefox 프로필을 이용해 YouTube Studio 업로드
+
+## 필요한 설정
 
 ```json
 {
-  "firefox_profile": "The path to your Firefox profile (used to log in to YouTube)",
+  "firefox_profile": "/path/to/firefox/profile",
   "headless": true,
-  "llm": "The Large Language Model you want to use to generate the video script.",
-  "image_model": "What AI Model you want to use to generate images.",
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_model": "llama3.2:3b",
+  "nanobanana2_api_key": "your_gemini_api_key",
   "threads": 4,
-  "is_for_kids": true
+  "is_for_kids": false
 }
 ```
 
-## Roadmap
+## 참고
 
-Here are some features that are planned for the future:
-
-- [ ] Subtitles (using either AssemblyAI or locally assembling them)
+- 배경음악은 `Songs/` 폴더에 직접 넣거나 `zip_url`로 받아옵니다.
+- 스케줄러는 foreground 방식입니다.
+- DOM 구조가 바뀌면 Selenium 업로드가 깨질 수 있으니 정기 점검이 필요합니다.
