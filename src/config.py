@@ -50,15 +50,6 @@ def get_first_time_running() -> bool:
     """
     return not os.path.exists(os.path.join(ROOT_DIR, ".mp"))
 
-def get_email_credentials() -> dict:
-    """
-    Gets the email credentials from the config file.
-
-    Returns:
-        credentials (dict): The email credentials
-    """
-    return load_config()["email"]
-
 def get_verbose() -> bool:
     """
     Gets the verbose flag from the config file.
@@ -114,6 +105,45 @@ def get_ollama_model() -> str:
         model (str): The Ollama model name, or empty string if not set.
     """
     return load_config().get("ollama_model", "")
+
+def get_llm_provider() -> str:
+    """
+    Gets the configured LLM provider.
+
+    Returns:
+        provider (str): Provider name
+    """
+    return str(load_config().get("llm_provider", "ollama")).strip().lower()
+
+def get_llm_base_url() -> str:
+    """
+    Gets the configured base URL for the active LLM provider.
+
+    Returns:
+        url (str): Base URL
+    """
+    config = load_config()
+    return str(config.get("llm_base_url") or config.get("ollama_base_url", "http://127.0.0.1:11434")).rstrip("/")
+
+def get_llm_model() -> str:
+    """
+    Gets the configured model name for the active LLM provider.
+
+    Returns:
+        model (str): Model name
+    """
+    config = load_config()
+    return str(config.get("llm_model") or config.get("ollama_model", "")).strip()
+
+def get_llm_api_key() -> str:
+    """
+    Gets the configured API key for OpenAI-compatible LLM providers.
+
+    Returns:
+        key (str): API key, if configured
+    """
+    configured = str(load_config().get("llm_api_key", "")).strip()
+    return configured or os.environ.get("OPENAI_API_KEY", "") or os.environ.get("LLM_API_KEY", "")
 
 def get_twitter_language() -> str:
     """
@@ -193,7 +223,7 @@ def get_is_for_kids() -> bool:
 
 def get_google_maps_scraper_zip_url() -> str:
     """
-    Gets the URL to the zip file containing the Google Maps scraper.
+    Gets the URL to the zip file containing the google-maps-scraper source.
 
     Returns:
         url (str): The URL to the zip file
@@ -202,39 +232,21 @@ def get_google_maps_scraper_zip_url() -> str:
 
 def get_google_maps_scraper_niche() -> str:
     """
-    Gets the niche for the Google Maps scraper.
+    Gets the niche (search keyword) for the Google Maps scraper.
 
     Returns:
         niche (str): The niche
     """
-    return load_config()["google_maps_scraper_niche"]
+    return load_config().get("google_maps_scraper_niche", "")
 
 def get_scraper_timeout() -> int:
     """
-    Gets the timeout for the scraper.
+    Gets the timeout (seconds) for the scraper run.
 
     Returns:
-        timeout (int): The timeout
+        timeout (int): Timeout in seconds, defaults to 300
     """
-    return load_config()["scraper_timeout"] or 300
-
-def get_outreach_message_subject() -> str:
-    """
-    Gets the outreach message subject.
-
-    Returns:
-        subject (str): The outreach message subject
-    """
-    return load_config()["outreach_message_subject"]
-    
-def get_outreach_message_body_file() -> str:
-    """
-    Gets the outreach message body file.
-
-    Returns:
-        file (str): The outreach message body file
-    """
-    return load_config()["outreach_message_body_file"]
+    return load_config().get("scraper_timeout") or 300
 
 def get_tts_voice() -> str:
     """

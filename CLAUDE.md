@@ -8,7 +8,7 @@ MoneyPrinterV2 (MPV2) is a Python 3.12 CLI tool that automates four online workf
 1. **YouTube Shorts** — generate video (LLM script → TTS → images → MoviePy composite) and upload via Selenium
 2. **Twitter/X Bot** — generate and post tweets via Selenium
 3. **Affiliate Marketing** — scrape Amazon product info, generate pitch, share on Twitter
-4. **Local Business Outreach** — scrape Google Maps (Go binary), extract emails, send cold outreach via SMTP
+4. **Local Lead Collection** — scrape Google Maps (Go binary) for local businesses, normalize phone numbers, persist as a reusable JSON lead store for other pipelines to consume via `get_leads()`
 
 There is no web UI, no REST API, no test suite, no CI, and no linting config.
 
@@ -57,11 +57,12 @@ LLM always uses the local Ollama server. Image generation always uses Nano Banan
 - **`src/classes/YouTube.py`** — most complex class; full pipeline: topic → script → metadata → image prompts → images → TTS → subtitles → MoviePy combine → Selenium upload
 - **`src/classes/Twitter.py`** — Selenium automation against x.com
 - **`src/classes/AFM.py`** — Amazon scraping + LLM pitch generation
-- **`src/classes/Outreach.py`** — Google Maps scraper (requires Go) + email sending via yagmail
+- **`src/classes/LeadScraper.py`** — Google Maps scraper (requires Go) + phone normalization; exposes `get_leads(niche=...)` pull API for other pipelines
 - **`src/classes/Tts.py`** — KittenTTS wrapper
 
 ### Data Storage
 All persistent state lives in `.mp/` at the project root as JSON files (`youtube.json`, `twitter.json`, `afm.json`). This directory also serves as scratch space for temporary WAV, PNG, SRT, and MP4 files — non-JSON files are cleaned on each run by `rem_temp_files()`.
+
 
 ### Browser Automation
 Selenium uses pre-authenticated Firefox profiles (never handles login). The profile path is stored per-account in the cache JSON and also in `config.json` as a default.
@@ -76,7 +77,7 @@ All config lives in `config.json` at the project root. See `config.example.json`
 - **Firefox profile** — must be pre-logged-in to target platforms (`firefox_profile`)
 - **Ollama** — for LLM text generation (via `ollama` Python SDK)
 - **Nano Banana 2** — for image generation (Gemini image API)
-- **Go** — only needed for Outreach (Google Maps scraper)
+- **Go** — only needed for LeadScraper (Google Maps scraper)
 
 ## Contributing
 

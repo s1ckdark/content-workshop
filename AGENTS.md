@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - `src/` contains the application code. Use `src/main.py` as the interactive entrypoint.
-- `src/classes/` holds provider-specific components (for example `YouTube.py`, `Twitter.py`, `Tts.py`, `AFM.py`, `Outreach.py`).
+- `src/classes/` holds provider-specific components (for example `YouTube.py`, `Twitter.py`, `Tts.py`, `AFM.py`, `LeadScraper.py`).
 - Shared utilities and configuration live in modules like `src/config.py`, `src/utils.py`, `src/cache.py`, and `src/constants.py`.
 - `scripts/` contains helper workflows such as setup, preflight checks, and upload helpers.
 - `docs/` contains feature documentation; `assets/` and `fonts/` contain static resources.

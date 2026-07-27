@@ -1,7 +1,7 @@
 # 컨텐츠제작소
 
 로컬 환경에서 돌아가는 콘텐츠 제작 자동화 스튜디오입니다.  
-YouTube Shorts 생성, Twitter/X 포스팅, 제휴 문구 생성, 로컬 비즈니스 아웃리치까지 한 저장소에서 다룹니다.
+YouTube Shorts 생성, Twitter/X 포스팅, 제휴 문구 생성까지 한 저장소에서 다룹니다.
 
 이 저장소는 기존 자동화 코드를 정리하면서, 과장된 수익형 브랜딩 대신 실제 작업 중심의 `콘텐츠 제작 워크벤치` 방향으로 재구성하는 중입니다.
 
@@ -11,7 +11,7 @@ YouTube Shorts 생성, Twitter/X 포스팅, 제휴 문구 생성, 로컬 비즈�
 - YouTube Studio 업로드 자동화
 - Twitter/X 문구 생성 및 자동 게시
 - Amazon 제휴 링크 기반 홍보 문구 생성
-- Google Maps 기반 로컬 비즈니스 수집 및 이메일 아웃리치
+- Google Maps 기반 로컬 비즈니스 전화번호 수집 (다른 파이프라인에서 재사용 가능한 리드 DB)
 
 ## YouTube 흐름
 
@@ -47,7 +47,7 @@ python3 src/main.py
 - Ollama
 - ImageMagick
 - YouTube 생성 기능 사용 시 Gemini API 키
-- Outreach 기능 사용 시 Go
+- 로컬 리드 수집 기능 사용 시 Go
 
 ## 설정
 
@@ -72,7 +72,7 @@ python3 src/main.py
 - `src/classes/YouTube.py`: Shorts 생성 및 업로드
 - `src/classes/Twitter.py`: Twitter/X 자동 포스팅
 - `src/classes/AFM.py`: 제휴 문구 생성
-- `src/classes/Outreach.py`: 스크래핑 및 이메일 아웃리치
+- `src/classes/LeadScraper.py`: 로컬 비즈니스 전화번호 수집 및 재사용 API
 - `src/config.py`: 설정 로딩
 - `src/cache.py`: `.mp` JSON 캐시 관리
 - `scripts/`: 로컬 셋업, 프리플라이트, 업로드 스크립트

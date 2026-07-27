@@ -3,7 +3,7 @@ import sys
 
 from status import *
 from cache import get_accounts
-from config import get_ollama_model, get_verbose
+from config import get_llm_model, get_verbose
 from classes.Tts import TTS
 from classes.Twitter import Twitter
 from classes.YouTube import YouTube
@@ -43,12 +43,12 @@ def main():
         None. The function performs operations based on the purpose and account UUID and does not return any value."""
     purpose = str(sys.argv[1])
     account_id = str(sys.argv[2])
-    model = str(sys.argv[3]) if len(sys.argv) > 3 else get_ollama_model()
+    model = str(sys.argv[3]) if len(sys.argv) > 3 else get_llm_model()
 
     if model:
         select_model(model)
     else:
-        error("No Ollama model specified. Pass model name as third argument or set ollama_model in config.json.")
+        error("No LLM model specified. Pass model name as third argument or set llm_model in config.json.")
         sys.exit(1)
 
     verbose = get_verbose()

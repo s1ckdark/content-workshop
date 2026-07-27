@@ -17,11 +17,9 @@
 - `threads`: MoviePy 렌더 스레드 수
 - `zip_url`: 배경음악 ZIP URL
 - `is_for_kids`: YouTube 업로드 시 아동용 여부
-- `google_maps_scraper`: Google Maps scraper ZIP URL
-- `google_maps_scraper_niche`: 수집할 업종/키워드
-- `scraper_timeout`: 스크래퍼 실행 제한 시간
-- `outreach_message_subject`: 이메일 제목 템플릿
-- `outreach_message_body_file`: 이메일 본문 HTML 파일
+- `google_maps_scraper`: Google Maps scraper 소스 ZIP URL
+- `google_maps_scraper_niche`: 수집할 업종/키워드 (빈 문자열이면 CLI에서 입력)
+- `scraper_timeout`: 스크래퍼 실행 제한 시간 (초)
 - `stt_provider`: `local_whisper` 또는 `third_party_assemblyai`
 - `whisper_model`: faster-whisper 모델명
 - `whisper_device`: `auto`, `cpu`, `cuda`

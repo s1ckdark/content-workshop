@@ -9,7 +9,7 @@ OPTIONS = [
     "YouTube Shorts Studio",
     "Twitter/X Automation",
     "Affiliate Campaigns",
-    "Outreach",
+    "Collect Local Leads",
     "Quit"
 ]
 
