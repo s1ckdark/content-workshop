@@ -8,6 +8,7 @@ from classes.Tts import TTS
 from classes.Twitter import Twitter
 from classes.YouTube import YouTube
 from llm_provider import select_model
+from templates import load_account_template
 
 
 def get_account_browser_profile(account: dict) -> str:
@@ -85,12 +86,16 @@ def main():
             if acc["id"] == account_id:
                 if verbose:
                     info("Initializing YouTube...")
+                template, template_warning = load_account_template(acc)
+                if template_warning:
+                    warning(template_warning)
                 youtube = YouTube(
                     acc["id"],
                     acc["nickname"],
                     get_account_browser_profile(acc),
                     acc["niche"],
-                    acc["language"]
+                    acc["language"],
+                    template=template,
                 )
                 youtube.generate_video(tts)
                 youtube.upload_video()

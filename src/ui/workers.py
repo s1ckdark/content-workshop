@@ -8,13 +8,15 @@ that's already in flight, so cancel = "stop after the current step".
 """
 
 import os
-from typing import Optional
+from typing import List, Optional
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from classes.ReferenceAnalyzer import analyze
 from classes.Tts import TTS
 from classes.YouTube import YouTube
-from config import ROOT_DIR
+from config import ROOT_DIR, get_nanobanana2_api_key
+from templates import TemplateCancelled, load_account_template, run_template_pipeline, synthesize
 from utils import fetch_songs
 
 
@@ -85,6 +87,12 @@ class VideoWorker(QObject):
         self._ensure_songs()
         self._check()
 
+        template, template_warning = load_account_template(account)
+        if template_warning:
+            self.log.emit(template_warning)
+        if template is not None:
+            self.log.emit(f"포맷 템플릿: {template.get('name', '')}")
+
         self.progress.emit("브라우저 컨텍스트 시작", 4)
         self._yt = YouTube(
             account["id"],
@@ -92,6 +100,7 @@ class VideoWorker(QObject):
             account.get("browser_profile") or account.get("firefox_profile", ""),
             account.get("niche", ""),
             account.get("language", ""),
+            template=template,
         )
         self._check()
 
@@ -120,7 +129,9 @@ class VideoWorker(QObject):
             raise RuntimeError("생성된 이미지가 없습니다. Nano Banana 2 설정을 확인하세요.")
 
         self.progress.emit("음성 합성 (TTS)", 75)
-        self._yt.generate_script_to_speech(TTS())
+        tts = TTS()
+        self.log.emit(f"TTS 제공자: {tts.provider}")
+        self._yt.generate_script_to_speech(tts)
         self._check()
 
         self.progress.emit("자막 + 영상 합성 (MoviePy)", 85)
@@ -240,3 +251,55 @@ class UploadWorker(QObject):
         self.progress.emit("완료", 100)
         self.log.emit(f"업로드된 URL: {url}")
         self.finished.emit(url)
+
+
+class TemplateWorker(QObject):
+    """Analyzes reference Shorts and synthesizes a format template."""
+
+    progress = Signal(str, int)
+    log = Signal(str)
+    finished = Signal(object)   # template dict
+    failed = Signal(str)
+
+    def __init__(self, urls: List[str], name: str) -> None:
+        super().__init__()
+        self._urls = urls
+        self._name = name
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    @Slot()
+    def run(self) -> None:
+        if not get_nanobanana2_api_key():
+            self.failed.emit(
+                "Gemini API 키가 설정되지 않았습니다. config.json의 nanobanana2_api_key를 확인하세요."
+            )
+            return
+
+        try:
+            template, failures = run_template_pipeline(
+                self._urls,
+                self._name,
+                analyze_fn=self._analyze,
+                synthesize_fn=synthesize,
+                on_progress=self.progress.emit,
+                is_cancelled=lambda: self._cancelled,
+            )
+        except TemplateCancelled:
+            self.failed.emit("사용자가 취소했습니다.")
+            return
+        except Exception as exc:
+            self.failed.emit(f"{type(exc).__name__}: {exc}")
+            return
+
+        for failure in failures:
+            self.log.emit(f"건너뜀: {failure}")
+        self.progress.emit("완료", 100)
+        self.finished.emit(template)
+
+    def _analyze(self, url: str) -> dict:
+        result = analyze(url)
+        self.log.emit(f"분석 완료: {url} — {result.get('topic', '')}")
+        return result

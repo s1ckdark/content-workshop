@@ -158,6 +158,28 @@ def remove_account(provider: str, account_id: str) -> None:
 
     write_json_atomic(cache_path, {"accounts": accounts})
 
+def update_account(provider: str, account_id: str, fields: dict) -> bool:
+    """
+    Merges fields into an existing account.
+
+    Args:
+        provider (str): The provider ("twitter" or "youtube")
+        account_id (str): The ID of the account to update
+        fields (dict): Keys to set on the account
+
+    Returns:
+        updated (bool): False when no account matches account_id
+    """
+    accounts = get_accounts(provider)
+
+    for account in accounts:
+        if account.get("id") == account_id:
+            account.update(fields)
+            write_json_atomic(get_provider_cache_path(provider), {"accounts": accounts})
+            return True
+
+    return False
+
 def get_products() -> List[dict]:
     """
     Gets the products from the cache.
