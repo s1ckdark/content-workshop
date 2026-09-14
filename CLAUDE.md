@@ -10,7 +10,7 @@ MoneyPrinterV2 (MPV2) is a Python 3.12 CLI tool that automates four online workf
 3. **Affiliate Marketing** — scrape Amazon product info, generate pitch, share on Twitter
 4. **Local Lead Collection** — scrape Google Maps (Go binary) for local businesses, normalize phone numbers, persist as a reusable JSON lead store for other pipelines to consume via `get_leads()`
 
-There is no web UI, no REST API, no test suite, no CI, and no linting config.
+There is no web UI, no REST API, no CI, and no linting config. A `pytest` suite lives under `tests/`; run it with `venv/bin/python -m pytest` from the project root.
 
 ## Running the Application
 
@@ -51,14 +51,15 @@ LLM always uses the local Ollama server. Image generation always uses Nano Banan
 
 ### Key Modules
 - **`src/llm_provider.py`** — unified `generate_text(prompt)` function using the Ollama Python SDK
-- **`src/config.py`** — 30+ getter functions, each re-reads `config.json` on every call (no caching). `ROOT_DIR` = project root, computed as `os.path.dirname(sys.path[0])`
+- **`src/config.py`** — 30+ getter functions reading from `config.json`, cached once per process via `load_config()` (`_CONFIG_CACHE`; pass `force_reload=True` to re-read from disk). `ROOT_DIR` = project root, computed as `os.path.dirname(sys.path[0])`
 - **`src/cache.py`** — JSON file persistence in `.mp/` directory (accounts, videos, posts, products)
 - **`src/constants.py`** — menu strings, Selenium selectors (YouTube Studio, X.com, Amazon)
 - **`src/classes/YouTube.py`** — most complex class; full pipeline: topic → script → metadata → image prompts → images → TTS → subtitles → MoviePy combine → Selenium upload
 - **`src/classes/Twitter.py`** — Selenium automation against x.com
 - **`src/classes/AFM.py`** — Amazon scraping + LLM pitch generation
 - **`src/classes/LeadScraper.py`** — Google Maps scraper (requires Go) + phone normalization; exposes `get_leads(niche=...)` pull API for other pipelines
-- **`src/classes/Tts.py`** — KittenTTS wrapper
+- **`src/classes/Tts.py`** — `TTS` provider dispatch (`tts_provider`: `kittentts` or `gemini`); `unsupported_language_reason()` blocks kittentts (English-only) from narrating a non-English account/template
+- **`src/templates.py`** — reference-based YouTube Shorts format templates: analyzes reference URLs via Gemini, synthesizes/stores a reusable template (niche, hook pattern, tone, visual style, sentence count) in `.mp/templates.json`, and loads a YouTube account's linked template for the generation pipeline
 
 ### Data Storage
 All persistent state lives in `.mp/` at the project root as JSON files (`youtube.json`, `twitter.json`, `afm.json`). This directory also serves as scratch space for temporary WAV, PNG, SRT, and MP4 files — non-JSON files are cleaned on each run by `rem_temp_files()`.

@@ -156,7 +156,7 @@ API 키와 base URL은 기존 `nanobanana2_api_key`, `nanobanana2_api_base_url`�
 ## 8. TTS 제공자
 
 - `kittentts`: 기존 동작 유지. 영어 전용.
-- `gemini`: `{base_url}/models/{gemini_tts_model}:generateContent`로 `responseModalities: ["AUDIO"]`, `speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName` 요청. `style`이 있으면 텍스트 앞에 "다음을 {style} 말투로 읽어 주세요:" 형태의 지시를 붙인다. 응답의 base64 PCM(16-bit, mono, 24kHz)을 `wave` 모듈로 WAV로 저장한다.
+- `gemini`: `{base_url}/models/{gemini_tts_model}:generateContent`로 `responseModalities: ["AUDIO"]`, `speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName` 요청. `style`이 있으면 영어 전문(preamble) "Synthesize speech for the transcript below. Read only the transcript aloud."과 `Director's notes - Style: {style}`, `#### TRANSCRIPT` 레이블을 텍스트 앞에 붙인다 — Gemini TTS 공식 가이드에 따라 지시문을 그대로 읽거나 애매한 프롬프트로 거부되는 것을 방지하기 위함이다. 응답의 base64 PCM(16-bit, mono, 24kHz)을 `wave` 모듈로 WAV로 저장하며, 실패 시 2회 재시도한다.
 - 구현 전 공식 문서로 요청/응답 필드명과 PCM 사양을 재확인한다.
 - 한국어 계정은 `whisper_model`을 `small` 이상으로 권장한다고 `docs/Configuration.md`에 명시한다.
 
@@ -182,8 +182,9 @@ API 키와 base URL은 기존 `nanobanana2_api_key`, `nanobanana2_api_base_url`�
 | 성공한 분석 0개 | `failed`로 실패 URL 목록 표시 |
 | 합성 LLM 호출 실패 | 1회 재시도, 재실패 시 `failed` (분석 결과는 로그로만 남김) |
 | 계정의 `template_id`에 해당하는 템플릿 없음 | 경고 로그 후 템플릿 없이 생성 |
-| Gemini TTS 실패 | 2회 재시도 후 작업 실패 (KittenTTS로 대체하지 않음) |
+| Gemini TTS 실패 | 2회 재시도 후 작업 실패 (KittenTTS로 대체하지 않음 — 언어 불일치 영상 방지) |
 | 템플릿 삭제 시 연결된 계정 존재 | 삭제 확인 창에 연결 계정 수 표시 |
+| kittentts 제공자 + 비영어 계정 | 생성 시작 전 작업 실패 |
 
 ## 11. 테스트
 
