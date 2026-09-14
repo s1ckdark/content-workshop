@@ -46,6 +46,20 @@ def test_generate_content_wraps_network_errors(fake_post):
         generate_content("m1", {})
 
 
+def test_generate_content_wraps_non_json_body(fake_post):
+    class NonJsonResponse:
+        status_code = 200
+        text = "<html>not json</html>"
+
+        def json(self):
+            raise ValueError("no JSON object could be decoded")
+
+    fake_post.queue.append(NonJsonResponse())
+
+    with pytest.raises(GeminiError, match="JSON이 아닙니다"):
+        generate_content("m1", {})
+
+
 def test_parse_json_text_strips_code_fences():
     assert parse_json_text('```json\n{"a": 1}\n```') == {"a": 1}
 

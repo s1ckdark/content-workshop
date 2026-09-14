@@ -44,7 +44,10 @@ def generate_content(model: str, payload: dict, timeout: int = 300) -> dict:
     if response.status_code >= 400:
         raise GeminiError(f"Gemini HTTP {response.status_code}: {response.text[:300]}")
 
-    return response.json()
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise GeminiError("Gemini 응답이 JSON이 아닙니다.") from exc
 
 
 def response_text(body: dict) -> str:

@@ -77,9 +77,20 @@ class JobDialog(QDialog):
 
     @Slot(object)
     def _on_finished(self, result: object) -> None:
-        self._append_log(f"✓ 완료: {result}")
+        self._append_log(f"✓ 완료: {self._summarize(result)}")
         self._result = result
         self._mark_done()
+
+    @staticmethod
+    def _summarize(result: object) -> object:
+        # A dict result (e.g. a template with its full `analyses`) can be
+        # large; log a short identifier instead of dumping the whole thing.
+        if isinstance(result, dict):
+            for key in ("name", "title", "path"):
+                if result.get(key):
+                    return result[key]
+            return "dict"
+        return result
 
     @Slot(str)
     def _on_failed(self, msg: str) -> None:
@@ -110,3 +121,10 @@ class JobDialog(QDialog):
             return
         self._thread.wait(2000)
         super().closeEvent(event)
+
+    def reject(self) -> None:  # type: ignore[override]
+        # QDialog.reject() (triggered by Esc) bypasses closeEvent, so it
+        # would close a still-running job. Ignore it until the job is done.
+        if not self._done:
+            return
+        super().reject()
