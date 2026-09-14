@@ -16,6 +16,15 @@ from status import *
 from uuid import uuid4
 from constants import *
 from typing import List, Optional
+from prompts import (
+    apply_visual_style,
+    build_script_prompt,
+    build_topic_prompt,
+    resolve_language,
+    resolve_sentence_count,
+    resolve_subtitle_color,
+    resolve_tts_style,
+)
 from termcolor import colored
 from moviepy.video.tools.subtitles import SubtitlesClip
 from datetime import datetime
@@ -153,6 +162,7 @@ class YouTube:
         fp_profile_path: str,
         niche: str,
         language: str,
+        template: Optional[dict] = None,
     ) -> None:
         """
         Constructor for YouTube Class.
@@ -163,6 +173,7 @@ class YouTube:
             fp_profile_path (str): Path to the Chrome user data dir logged into the specified YouTube account.
             niche (str): The niche of the provided YouTube Channel.
             language (str): The language of the Automation.
+            template (Optional[dict]): Format template linked to the account, if any.
 
         Returns:
             None
@@ -171,7 +182,8 @@ class YouTube:
         self._account_nickname: str = account_nickname
         self._fp_profile_path: str = fp_profile_path
         self._niche: str = niche
-        self._language: str = language
+        self._template: Optional[dict] = template
+        self._language: str = resolve_language(language, template)
 
         self.images = []
         self.title_image_path: Optional[str] = None
@@ -198,6 +210,16 @@ class YouTube:
         """
         return self._language
 
+    @property
+    def template(self) -> Optional[dict]:
+        """
+        Getter Method for the linked format template.
+
+        Returns:
+            template (Optional[dict]): The template, or None
+        """
+        return self._template
+
     def generate_response(self, prompt: str, model_name: str = None) -> str:
         """
         Generates an LLM Response based on a prompt and the user-provided model.
@@ -217,8 +239,11 @@ class YouTube:
         Returns:
             topic (str): The generated topic.
         """
+        existing_titles = (
+            [video.get("title", "") for video in self.get_videos()] if self._template else []
+        )
         completion = self.generate_response(
-            f"Please generate a specific video idea that takes about the following topic: {self.niche}. Make it exactly one sentence. Only return the topic, nothing else."
+            build_topic_prompt(self.niche, self._template, existing_titles)
         )
 
         if not completion:
@@ -235,29 +260,8 @@ class YouTube:
         Returns:
             script (str): The script of the video.
         """
-        sentence_length = get_script_sentence_length()
-        prompt = f"""
-        Generate a script for a video in {sentence_length} sentences, depending on the subject of the video.
-
-        The script is to be returned as a string with the specified number of paragraphs.
-
-        Here is an example of a string:
-        "This is an example string."
-
-        Do not under any circumstance reference this prompt in your response.
-
-        Get straight to the point, don't start with unnecessary things like, "welcome to this video".
-
-        Obviously, the script should be related to the subject of the video.
-        
-        YOU MUST NOT EXCEED THE {sentence_length} SENTENCES LIMIT. MAKE SURE THE {sentence_length} SENTENCES ARE SHORT.
-        YOU MUST NOT INCLUDE ANY TYPE OF MARKDOWN OR FORMATTING IN THE SCRIPT, NEVER USE A TITLE.
-        YOU MUST WRITE THE SCRIPT IN THE LANGUAGE SPECIFIED IN [LANGUAGE].
-        ONLY RETURN THE RAW CONTENT OF THE SCRIPT. DO NOT INCLUDE "VOICEOVER", "NARRATOR" OR SIMILAR INDICATORS OF WHAT SHOULD BE SPOKEN AT THE BEGINNING OF EACH PARAGRAPH OR LINE. YOU MUST NOT MENTION THE PROMPT, OR ANYTHING ABOUT THE SCRIPT ITSELF. ALSO, NEVER TALK ABOUT THE AMOUNT OF PARAGRAPHS OR LINES. JUST WRITE THE SCRIPT
-        
-        Subject: {self.subject}
-        Language: {self.language}
-        """
+        sentence_length = resolve_sentence_count(get_script_sentence_length(), self._template)
+        prompt = build_script_prompt(self.subject, self.language, sentence_length, self._template)
         completion = self.generate_response(prompt)
 
         # Apply regex to remove *
@@ -378,6 +382,8 @@ class YouTube:
 
         if len(image_prompts) > n_prompts:
             image_prompts = image_prompts[: int(n_prompts)]
+
+        image_prompts = apply_visual_style(image_prompts, self._template)
 
         self.image_prompts = image_prompts
 
@@ -539,7 +545,7 @@ class YouTube:
         # Clean script, remove every character that is not a word character, a space, a period, a question mark, or an exclamation mark.
         self.script = re.sub(r"[^\w\s.?!]", "", self.script)
 
-        tts_instance.synthesize(self.script, path)
+        tts_instance.synthesize(self.script, path, style=resolve_tts_style(self._template))
 
         self.tts_path = path
 
@@ -696,7 +702,7 @@ class YouTube:
         def generator(txt):
             clip_kwargs = {
                 "font": _resolve_font_path(txt),
-                "color": "#FFFF00",
+                "color": resolve_subtitle_color(self._template),
                 "stroke_color": "black",
                 "stroke_width": 5,
                 "size": (1080, 1920),
