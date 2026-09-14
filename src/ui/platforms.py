@@ -8,7 +8,7 @@ this list to render the sidebar, the account list, and the add dialog.
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from cache import (
     add_account,
@@ -18,6 +18,8 @@ from cache import (
     get_products,
     remove_account,
 )
+from templates import count_linked_accounts, get_templates, remove_template
+from ui.template_dialog import add_template_flow, edit_template_flow
 
 
 @dataclass
@@ -26,8 +28,9 @@ class FieldSpec:
     key: str
     label: str
     required: bool = True
-    kind: str = "text"  # text | path
+    kind: str = "text"  # text | path | choice
     placeholder: str = ""
+    choices_fn: Optional[Callable[[], List[tuple]]] = None  # [(label, value), ...] for kind="choice"
 
 
 @dataclass
@@ -43,6 +46,11 @@ class Platform:
 
     columns: List[tuple]  # [(header, dict_key), ...]
     fields: List[FieldSpec] = field(default_factory=list)
+
+    # Optional hooks for platforms whose add/edit flow is not a simple form.
+    custom_add: Optional[Callable[[Any], bool]] = None        # (parent) -> changed
+    edit_fn: Optional[Callable[[Any, dict], bool]] = None     # (parent, row) -> changed
+    remove_warning_fn: Optional[Callable[[str], str]] = None  # (item_id) -> extra warning
 
 
 def _load_leads() -> List[dict]:
@@ -61,18 +69,42 @@ def _load_leads() -> List[dict]:
     return []
 
 
+def template_choices() -> List[tuple]:
+    return [("사용 안 함", "")] + [(t.get("name", ""), t.get("id", "")) for t in get_templates()]
+
+
+def _youtube_rows() -> List[dict]:
+    names = {t.get("id"): t.get("name", "") for t in get_templates()}
+    return [
+        {**account, "template_name": names.get(account.get("template_id"), "")}
+        for account in get_accounts("youtube")
+    ]
+
+
+def _template_rows() -> List[dict]:
+    return [{**t, "reference_count": len(t.get("source_urls", []))} for t in get_templates()]
+
+
+def _template_remove_warning(template_id: str) -> str:
+    linked = count_linked_accounts(template_id, get_accounts("youtube"))
+    if not linked:
+        return ""
+    return f"이 템플릿에 연결된 YouTube 계정이 {linked}개 있습니다. 삭제하면 해당 계정은 니치 설정으로 생성합니다."
+
+
 PLATFORMS: List[Platform] = [
     Platform(
         key="youtube",
         label="YouTube Shorts",
         item_label="계정",
-        list_fn=lambda: get_accounts("youtube"),
+        list_fn=_youtube_rows,
         add_fn=lambda data: add_account("youtube", data),
         remove_fn=lambda account_id: remove_account("youtube", account_id),
         columns=[
             ("닉네임", "nickname"),
             ("니치", "niche"),
             ("언어", "language"),
+            ("템플릿", "template_name"),
             ("UUID", "id"),
         ],
         fields=[
@@ -80,7 +112,32 @@ PLATFORMS: List[Platform] = [
             FieldSpec("browser_profile", "Chrome 프로필 경로", kind="path"),
             FieldSpec("niche", "니치"),
             FieldSpec("language", "언어", placeholder="korean"),
+            FieldSpec(
+                "template_id",
+                "포맷 템플릿",
+                required=False,
+                kind="choice",
+                choices_fn=template_choices,
+            ),
         ],
+    ),
+    Platform(
+        key="templates",
+        label="포맷 템플릿",
+        item_label="템플릿",
+        list_fn=_template_rows,
+        add_fn=None,
+        remove_fn=remove_template,
+        columns=[
+            ("이름", "name"),
+            ("니치", "niche"),
+            ("언어", "language"),
+            ("레퍼런스", "reference_count"),
+            ("ID", "id"),
+        ],
+        custom_add=add_template_flow,
+        edit_fn=edit_template_flow,
+        remove_warning_fn=_template_remove_warning,
     ),
     Platform(
         key="twitter",

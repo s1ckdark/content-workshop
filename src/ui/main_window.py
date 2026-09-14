@@ -8,6 +8,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -21,10 +22,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from cache import update_account
 from ui.account_dialog import AccountDialog
 from ui.job_dialog import JobDialog
 from ui.model_picker import ensure_model_selected
-from ui.platforms import PLATFORMS, Platform
+from ui.platforms import PLATFORMS, Platform, template_choices
 from ui.workers import UploadWorker, VideoWorker
 
 
@@ -84,6 +86,10 @@ class MainWindow(QMainWindow):
         self._run_action.triggered.connect(self._on_run)
         self._toolbar.addAction(self._run_action)
 
+        self._link_action = QAction("템플릿 연결", self)
+        self._link_action.triggered.connect(self._on_link_template)
+        self._toolbar.addAction(self._link_action)
+
         self._toolbar.addSeparator()
         self._count_label = QLabel("")
         self._toolbar.addWidget(self._count_label)
@@ -129,13 +135,18 @@ class MainWindow(QMainWindow):
                 self._table.columnCount() - 1, QHeaderView.ResizeMode.ResizeToContents
             )
 
-        self._add_action.setEnabled(platform.add_fn is not None)
+        self._add_action.setEnabled(platform.add_fn is not None or platform.custom_add is not None)
         self._remove_action.setEnabled(platform.remove_fn is not None)
         self._run_action.setEnabled(platform.key == "youtube")
+        self._link_action.setEnabled(platform.key == "youtube")
         self._count_label.setText(f"  {len(rows)}개의 {platform.item_label}")
 
     def _on_add(self) -> None:
         platform = self._current_platform
+        if platform.custom_add is not None:
+            if platform.custom_add(self):
+                self._reload_table()
+            return
         if platform.add_fn is None:
             return
 
@@ -160,30 +171,37 @@ class MainWindow(QMainWindow):
         if not item_id:
             return
 
-        confirm = QMessageBox.question(
-            self,
-            "삭제 확인",
-            f"이 {platform.item_label}을(를) 삭제할까요?",
-        )
+        message = f"이 {platform.item_label}을(를) 삭제할까요?"
+        if platform.remove_warning_fn is not None:
+            extra = platform.remove_warning_fn(item_id)
+            if extra:
+                message = f"{extra}\n\n{message}"
+        confirm = QMessageBox.question(self, "삭제 확인", message)
         if confirm == QMessageBox.StandardButton.Yes:
             platform.remove_fn(item_id)
             self._reload_table()
 
     # ----------------------------------------------------- video generation
     def _on_table_double_click(self, _index) -> None:
-        if self._current_platform.key == "youtube":
+        platform = self._current_platform
+        if platform.key == "youtube":
             self._on_run()
+            return
+        if platform.edit_fn is not None:
+            row = self._selected_row()
+            if row is not None and platform.edit_fn(self, row):
+                self._reload_table()
 
-    def _selected_account(self) -> dict | None:
+    def _selected_row(self) -> dict | None:
         platform = self._current_platform
         row = self._table.currentRow()
         if row < 0:
             return None
         item = self._table.item(row, 0)
         item_id = item.data(Qt.ItemDataRole.UserRole) if item else ""
-        for account in platform.list_fn():
-            if account.get("id") == item_id:
-                return account
+        for entry in platform.list_fn():
+            if entry.get("id") == item_id:
+                return entry
         return None
 
     def _on_run(self) -> None:
@@ -191,7 +209,7 @@ class MainWindow(QMainWindow):
         if platform.key != "youtube":
             return
 
-        account = self._selected_account()
+        account = self._selected_row()
         if account is None:
             QMessageBox.information(self, "선택 필요", "먼저 계정을 선택해 주세요.")
             return
@@ -225,4 +243,27 @@ class MainWindow(QMainWindow):
         url = upload_dlg.result()
         if url:
             QMessageBox.information(self, "업로드 완료", f"업로드된 URL:\n{url}")
+        self._reload_table()
+
+    def _on_link_template(self) -> None:
+        if self._current_platform.key != "youtube":
+            return
+        account = self._selected_row()
+        if account is None:
+            QMessageBox.information(self, "선택 필요", "먼저 계정을 선택해 주세요.")
+            return
+
+        choices = template_choices()
+        labels = [label for label, _ in choices]
+        current = next(
+            (i for i, (_, value) in enumerate(choices) if value == account.get("template_id", "")), 0
+        )
+        label, ok = QInputDialog.getItem(
+            self, "템플릿 연결", f"{account.get('nickname', '')} 계정의 포맷 템플릿", labels, current, False
+        )
+        if not ok:
+            return
+
+        template_id = choices[labels.index(label)][1]
+        update_account("youtube", account["id"], {"template_id": template_id})
         self._reload_table()

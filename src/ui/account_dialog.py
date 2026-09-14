@@ -6,6 +6,7 @@ the platform's field keys, with a fresh UUID injected as `id`.
 from uuid import uuid4
 
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -26,10 +27,18 @@ class AccountDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f"{platform.label} — 새 {platform.item_label}")
         self._platform = platform
-        self._inputs: dict[str, QLineEdit] = {}
+        self._inputs: dict[str, QLineEdit | QComboBox] = {}
 
         form = QFormLayout()
         for spec in platform.fields:
+            if spec.kind == "choice":
+                combo = QComboBox()
+                for label, value in (spec.choices_fn() if spec.choices_fn else []):
+                    combo.addItem(label, value)
+                form.addRow(spec.label, combo)
+                self._inputs[spec.key] = combo
+                continue
+
             line = QLineEdit()
             line.setPlaceholderText(spec.placeholder)
 
@@ -69,7 +78,11 @@ class AccountDialog(QDialog):
         payload: dict = {"id": str(uuid4())}
 
         for spec in self._platform.fields:
-            value = self._inputs[spec.key].text().strip()
+            widget = self._inputs[spec.key]
+            if isinstance(widget, QComboBox):
+                value = str(widget.currentData() or "")
+            else:
+                value = widget.text().strip()
             if spec.required and not value:
                 QMessageBox.warning(self, "필수 입력", f"'{spec.label}' 값을 입력해 주세요.")
                 return
