@@ -55,14 +55,18 @@ VideoWorker → YouTube(template=...) → topic / script / prompts / combine
 | 파일 | 상태 | 책임 | 의존 |
 |---|---|---|---|
 | `src/classes/ReferenceAnalyzer.py` | 신규 | `normalize_youtube_url(url) -> str \| None`, `analyze(url) -> dict`. Gemini REST 호출, 구조화 출력 | `config`, `requests` |
+| `src/gemini_client.py` | 신규 | Gemini `generateContent` REST 호출 공용 헬퍼 (요청 조립, 오류 처리) | `config`, `requests` |
+| `src/gemini_tts.py` | 신규 | Gemini TTS 요청, base64 PCM → WAV 변환, 재시도 처리 | `gemini_client`, `wave` |
 | `src/templates.py` | 신규 | `merge_numeric(analyses) -> dict`(규칙 계산), `synthesize(analyses, name) -> dict`, `get_templates()`, `get_template(id)`, `add_template(t)`, `remove_template(id)` | `cache.write_json_atomic`, `ReferenceAnalyzer` 결과 형식 |
 | `src/prompts.py` | 신규 | 템플릿 유무에 따른 topic/script/image 프롬프트 문자열 구성 (순수 함수, 테스트 대상) | 없음 |
 | `src/classes/Tts.py` | 변경 | `tts_provider` 분기, `synthesize(text, output_file, style=None)` | `config`, `requests`, `wave` |
 | `src/classes/YouTube.py` | 변경 | 생성자에 `template: Optional[dict]`, 프롬프트 구성을 `prompts.py`로 위임, 자막 색 반영 | `prompts` |
+| `src/cache.py` | 변경 | `update_account`로 계정의 `template_id` 갱신 | — |
+| `src/cron.py` | 변경 | 예약 실행 시 계정에 연결된 템플릿을 로드해 전달 | `templates` |
 | `src/ui/workers.py` | 변경 | `TemplateWorker` 추가, `VideoWorker`가 템플릿 로드 | `templates` |
 | `src/ui/template_dialog.py` | 신규 | URL·이름 입력 다이얼로그, 결과 검토·수정 다이얼로그 | PySide6 |
 | `src/ui/platforms.py` | 변경 | "포맷 템플릿" 플랫폼, `Platform.custom_add`, `FieldSpec.kind="choice"`, YouTube 계정 `template_id` 필드 | `templates` |
-| `src/ui/main_window.py`, `src/ui/account_dialog.py` | 변경 | `custom_add` 분기, `choice` 필드 렌더링 | — |
+| `src/ui/main_window.py`, `src/ui/account_dialog.py` | 변경 | `custom_add` 분기, `choice` 필드 렌더링, 메인 창의 "템플릿 연결" 액션으로 선택한 YouTube 계정에 템플릿을 연결/해제 | — |
 | `src/config.py`, `config.example.json`, `docs/Configuration.md` | 변경 | 신규 설정 키 | — |
 
 ## 5. 데이터 모델
@@ -128,16 +132,16 @@ YouTube 계정 dict에 선택 필드 `template_id: str` 추가. 없거나 빈 �
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `reference_analysis_model` | `gemini-3.6-flash` | 영상 분석·합성용 Gemini 모델 |
+| `reference_analysis_model` | `gemini-3.8-flash` | 영상 분석·합성용 Gemini 모델 |
 | `tts_provider` | `kittentts` | `kittentts` \| `gemini` |
-| `gemini_tts_model` | `""` (필수 입력 안내) | Gemini TTS 모델 ID |
-| `gemini_tts_voice` | `""` | Gemini TTS 프리셋 음성 이름 |
+| `gemini_tts_model` | `gemini-3.1-flash-tts-preview` | Gemini TTS 모델 ID |
+| `gemini_tts_voice` | `Kore` | Gemini TTS 프리셋 음성 이름 |
 
 API 키와 base URL은 기존 `nanobanana2_api_key`, `nanobanana2_api_base_url`을 재사용한다(`get_nanobanana2_api_key()`의 환경변수 폴백 포함).
 
 ## 7. 생성 파이프라인 반영
 
-템플릿이 `None`이면 `prompts.py`는 **현재 프롬프트 문자열과 동일한 결과**를 반환한다(회귀 방지 테스트 대상).
+템플릿이 `None`이면 `prompts.py`는 **템플릿 전용 지시가 없는 기존 프롬프트**를 반환한다(회귀 방지 테스트 대상).
 
 | 단계 | 템플릿이 있을 때 |
 |---|---|
@@ -178,7 +182,7 @@ API 키와 base URL은 기존 `nanobanana2_api_key`, `nanobanana2_api_base_url`�
 | 성공한 분석 0개 | `failed`로 실패 URL 목록 표시 |
 | 합성 LLM 호출 실패 | 1회 재시도, 재실패 시 `failed` (분석 결과는 로그로만 남김) |
 | 계정의 `template_id`에 해당하는 템플릿 없음 | 경고 로그 후 템플릿 없이 생성 |
-| Gemini TTS 실패 | 작업 실패로 처리 (조용히 KittenTTS로 대체하지 않음 — 언어 불일치 영상 방지) |
+| Gemini TTS 실패 | 2회 재시도 후 작업 실패 (KittenTTS로 대체하지 않음) |
 | 템플릿 삭제 시 연결된 계정 존재 | 삭제 확인 창에 연결 계정 수 표시 |
 
 ## 11. 테스트

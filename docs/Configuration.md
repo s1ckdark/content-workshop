@@ -25,7 +25,11 @@
 - `whisper_device`: `auto`, `cpu`, `cuda`
 - `whisper_compute_type`: 예: `int8`, `float16`
 - `assembly_ai_api_key`: AssemblyAI API 키
+- `tts_provider`: `kittentts`(영어 전용, 로컬) 또는 `gemini`(한국어 포함 다국어, Gemini API 키 필요)
 - `tts_voice`: KittenTTS 음성 이름
+- `gemini_tts_model`: Gemini TTS 모델명
+- `gemini_tts_voice`: Gemini TTS 프리셋 음성 이름 (예: `Kore`, `Puck`, `Charon`)
+- `reference_analysis_model`: 포맷 템플릿용 레퍼런스 영상 분석·합성 모델명
 - `font`: 자막 렌더링에 사용할 폰트 파일명
 - `imagemagick_path`: ImageMagick 실행 파일 경로
 - `script_sentence_length`: 스크립트 문장 수
@@ -35,3 +39,7 @@
 - `nanobanana2_api_key`가 비어 있으면 `GEMINI_API_KEY` 환경 변수를 사용합니다.
 - 앱은 필요한 시점에만 모델과 음원을 준비하도록 정리돼 있습니다.
 - YouTube 스케줄러를 돌릴 때는 `Songs/`에 음원이 준비돼 있어야 합니다.
+- 포맷 템플릿 분석과 Gemini TTS는 `nanobanana2_api_key`(또는 `GEMINI_API_KEY`)를 함께 사용합니다.
+- 레퍼런스 분석은 공개 YouTube 영상만 가능하며, 영상 파일은 내려받지 않습니다.
+- 한국어 계정은 자막 인식률을 위해 `whisper_model`을 `small` 이상으로 설정하는 것을 권장합니다.
+- 템플릿이 연결된 계정은 템플릿의 문장 수가 `script_sentence_length`보다 우선합니다.
