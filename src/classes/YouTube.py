@@ -15,7 +15,7 @@ from config import *
 from status import *
 from uuid import uuid4
 from constants import *
-from typing import List
+from typing import List, Optional
 from termcolor import colored
 from moviepy.video.tools.subtitles import SubtitlesClip
 from datetime import datetime
@@ -81,6 +81,22 @@ def _with_position(clip, position):
     )
 
 
+def _with_start(clip, start_time):
+    return (
+        clip.with_start(start_time)
+        if hasattr(clip, "with_start")
+        else clip.set_start(start_time)
+    )
+
+
+def _with_fadeout(clip, duration):
+    if vfx is not None and hasattr(vfx, "FadeOut") and hasattr(clip, "with_effects"):
+        return clip.with_effects([vfx.FadeOut(duration)])
+    if hasattr(clip, "fadeout"):
+        return clip.fadeout(duration)
+    return clip
+
+
 def _resize_clip(clip, size):
     return clip.resized(new_size=size) if hasattr(clip, "resized") else clip.resize(size)
 
@@ -97,6 +113,22 @@ def _crop_clip(clip, **kwargs):
         return clip.with_effects([vfx.Crop(**kwargs)])
 
     return crop(clip, **kwargs)
+
+
+def _resolve_font_path(text: str = "") -> str:
+    """Returns the best available font path, falling back to AppleGothic on macOS for Korean characters."""
+    default_font = os.path.join(get_fonts_dir(), get_font())
+    has_korean = any("\uac00" <= ch <= "\ud7a3" for ch in (text or ""))
+    if has_korean:
+        candidates = [
+            "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+            "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+    return default_font if os.path.exists(default_font) else get_font()
 
 
 class YouTube:
@@ -142,6 +174,8 @@ class YouTube:
         self._language: str = language
 
         self.images = []
+        self.title_image_path: Optional[str] = None
+        self.thumbnail_path: Optional[str] = None
         self.playwright, self.context = launch_persistent_chromium(self._fp_profile_path)
 
     @property
@@ -269,16 +303,28 @@ class YouTube:
     def generate_prompts(self) -> List[str]:
         """
         Generates AI Image Prompts based on the provided Video Script.
+        The first prompt is specifically crafted as an eye-catching Title/Cover image.
 
         Returns:
             image_prompts (List[str]): Generated List of image prompts.
         """
-        n_prompts = len(self.script) / 3
+        n_prompts = max(int(len(self.script) / 3), 2)
+        video_title = (
+            self.metadata.get("title", "")
+            if hasattr(self, "metadata") and isinstance(self.metadata, dict)
+            else ""
+        )
 
         prompt = f"""
         Generate {n_prompts} Image Prompts for AI Image Generation,
-        depending on the subject of a video.
+        depending on the subject and script of a video.
         Subject: {self.subject}
+        Title: {video_title}
+
+        CRITICAL REQUIREMENTS:
+        - The FIRST prompt (index 0) MUST be an eye-catching, highly dramatic Title / Cover image prompt
+          that visually represents the video title ('{video_title}'). It should serve as a high-impact opening hook for YouTube Shorts.
+        - The subsequent prompts (index 1 to {n_prompts - 1}) must visualize the progression of scenes in the script.
 
         The image prompts are to be returned as
         a JSON-Array of strings.
@@ -295,7 +341,7 @@ class YouTube:
 
         The search terms must be related to the subject of the video.
         Here is an example of a JSON-Array of strings:
-        ["image prompt 1", "image prompt 2", "image prompt 3"]
+        ["Eye-catching title cover image for {video_title}...", "scene 2 prompt...", "scene 3 prompt..."]
 
         For context, here is the full text:
         {self.script}
@@ -335,7 +381,7 @@ class YouTube:
 
         self.image_prompts = image_prompts
 
-        success(f"Generated {len(image_prompts)} Image Prompts.")
+        success(f"Generated {len(image_prompts)} Image Prompts (including Title image).")
 
         return image_prompts
 
@@ -359,6 +405,22 @@ class YouTube:
             info(f' => Wrote image from {provider_label} to "{image_path}"')
 
         self.images.append(image_path)
+
+        if self.title_image_path is None:
+            self.title_image_path = image_path
+            # Also save as dedicated thumbnail file
+            thumbnail_path = os.path.join(ROOT_DIR, ".mp", str(uuid4()) + "_thumbnail.png")
+            try:
+                with open(thumbnail_path, "wb") as thumb_file:
+                    thumb_file.write(image_bytes)
+                self.thumbnail_path = thumbnail_path
+                if hasattr(self, "metadata") and isinstance(self.metadata, dict):
+                    self.metadata["thumbnail_path"] = thumbnail_path
+                if get_verbose():
+                    info(f' => Saved title thumbnail to "{thumbnail_path}"')
+            except Exception as e:
+                warning(f"Failed to create thumbnail copy: {e}")
+
         return image_path
 
     def generate_image_nanobanana2(self, prompt: str) -> str:
@@ -433,6 +495,34 @@ class YouTube:
             path (str): The path to the generated image.
         """
         return self.generate_image_nanobanana2(prompt)
+
+    def generate_title_image(self, title: Optional[str] = None) -> Optional[str]:
+        """
+        Generates a dedicated title/cover image for the video based on its title and subject.
+
+        Args:
+            title (Optional[str]): Video title. Defaults to metadata['title'] or subject.
+
+        Returns:
+            image_path (Optional[str]): Path to the generated title image.
+        """
+        target_title = (
+            title
+            or (self.metadata.get("title") if hasattr(self, "metadata") and isinstance(self.metadata, dict) else None)
+            or getattr(self, "subject", "Interesting story")
+        )
+        prompt = (
+            f"Eye-catching, dramatic, high-impact Title and Cover image for a viral video titled: '{target_title}'. "
+            f"Subject: {getattr(self, 'subject', target_title)}. "
+            f"Vibrant colors, cinematic composition, captivating visual hook, 8k resolution concept art, YouTube Shorts cover."
+        )
+        if get_verbose():
+            info(f"Generating dedicated Title Image with prompt: {prompt}")
+        image_path = self.generate_image(prompt)
+        if image_path:
+            self.title_image_path = image_path
+            success(f"Generated title image: {image_path}")
+        return image_path
 
     def generate_script_to_speech(self, tts_instance: TTS) -> str:
         """
@@ -605,7 +695,7 @@ class YouTube:
         # Make a generator that returns a TextClip when called with consecutive
         def generator(txt):
             clip_kwargs = {
-                "font": os.path.join(get_fonts_dir(), get_font()),
+                "font": _resolve_font_path(txt),
                 "color": "#FFFF00",
                 "stroke_color": "black",
                 "stroke_width": 5,
@@ -667,6 +757,41 @@ class YouTube:
         final_clip = _with_fps(final_clip, 30)
         random_song = choose_random_song()
 
+        # Title Card Overlay (Shown during the intro / first scene)
+        title_clip = None
+        video_title = (
+            self.metadata.get("title", "")
+            if hasattr(self, "metadata") and isinstance(self.metadata, dict)
+            else ""
+        )
+        if video_title:
+            try:
+                title_font = _resolve_font_path(video_title)
+                title_dur = min(max(req_dur, 2.5), 4.0)
+                t_kwargs = {
+                    "font": title_font,
+                    "color": "#FFFFFF",
+                    "stroke_color": "black",
+                    "stroke_width": 6,
+                    "size": (960, None),
+                    "method": "caption",
+                }
+                if _HAS_MOVIEPY_V2:
+                    t_kwargs["text"] = video_title
+                    t_kwargs["font_size"] = 72
+                else:
+                    t_kwargs["txt"] = video_title
+                    t_kwargs["fontsize"] = 72
+
+                raw_title_clip = TextClip(**t_kwargs)
+                raw_title_clip = _with_duration(raw_title_clip, title_dur)
+                raw_title_clip = _with_position(raw_title_clip, ("center", 350))
+                title_clip = _with_fadeout(raw_title_clip, 0.6)
+                if get_verbose():
+                    info(f" => Added Title Card overlay: '{video_title}' ({title_dur:.1f}s)")
+            except Exception as e:
+                warning(f"Failed to create Title Card overlay: {e}")
+
         subtitles = None
         try:
             subtitles_path = self.generate_subtitles(self.tts_path)
@@ -685,8 +810,14 @@ class YouTube:
         final_clip = _with_audio(final_clip, comp_audio)
         final_clip = _with_duration(final_clip, tts_clip.duration)
 
+        video_layers = [final_clip]
+        if title_clip is not None:
+            video_layers.append(title_clip)
         if subtitles is not None:
-            final_clip = CompositeVideoClip([final_clip, subtitles])
+            video_layers.append(subtitles)
+
+        if len(video_layers) > 1:
+            final_clip = CompositeVideoClip(video_layers)
 
         final_clip.write_videofile(combined_image_path, threads=threads)
 

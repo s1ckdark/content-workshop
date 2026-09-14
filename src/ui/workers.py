@@ -156,12 +156,13 @@ class VideoWorker(QObject):
 
         for i, prompt in enumerate(prompts):
             self._check()
-            self.log.emit(f"이미지 {i + 1}/{n} 생성 중...")
+            label = "타이틀/커버 이미지" if i == 0 else f"장면 {i + 1}"
+            self.log.emit(f"{label} ({i + 1}/{n}) 생성 중...")
 
             if self._yt.generate_image(prompt) is None:
-                self.log.emit(f"이미지 {i + 1} 실패, 1회 재시도")
+                self.log.emit(f"{label} 실패, 1회 재시도")
                 if self._yt.generate_image(prompt) is None:
-                    self.log.emit(f"이미지 {i + 1} 재시도 실패, 스킵")
+                    self.log.emit(f"{label} 재시도 실패, 스킵")
 
             cumulative += weights[i]
             pct = int(phase_start + (cumulative / total_w) * (phase_end - phase_start))
