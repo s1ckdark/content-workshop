@@ -4,7 +4,7 @@ import sys
 from status import *
 from cache import get_accounts
 from config import get_llm_model, get_verbose
-from classes.Tts import TTS
+from classes.Tts import TTS, unsupported_language_reason
 from classes.Twitter import Twitter
 from classes.YouTube import YouTube
 from llm_provider import select_model
@@ -97,6 +97,10 @@ def main():
                     acc["language"],
                     template=template,
                 )
+                language_error = unsupported_language_reason(tts.provider, youtube.language)
+                if language_error:
+                    error(language_error)
+                    sys.exit(1)
                 youtube.generate_video(tts)
                 youtube.upload_video()
                 if verbose:

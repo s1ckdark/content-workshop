@@ -13,9 +13,9 @@ from typing import List, Optional
 from PySide6.QtCore import QObject, Signal, Slot
 
 from classes.ReferenceAnalyzer import analyze
-from classes.Tts import TTS
+from classes.Tts import TTS, unsupported_language_reason
 from classes.YouTube import YouTube
-from config import ROOT_DIR, get_nanobanana2_api_key
+from config import ROOT_DIR, get_nanobanana2_api_key, get_tts_provider
 from templates import TemplateCancelled, load_account_template, run_template_pipeline, synthesize
 from utils import fetch_songs
 
@@ -103,6 +103,10 @@ class VideoWorker(QObject):
             template=template,
         )
         self._check()
+
+        language_error = unsupported_language_reason(get_tts_provider(), self._yt.language)
+        if language_error:
+            raise RuntimeError(language_error)
 
         self.progress.emit("주제 생성", 8)
         self._yt.generate_topic()

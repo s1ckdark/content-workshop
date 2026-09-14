@@ -9,6 +9,23 @@ KITTEN_SAMPLE_RATE = 24000
 SUPPORTED_PROVIDERS = ("kittentts", "gemini")
 
 
+def unsupported_language_reason(provider: str, language: str) -> Optional[str]:
+    """
+    Returns a Korean error message when `provider` cannot narrate `language`,
+    or None when the combination is fine.
+
+    KittenTTS is English-only, so pairing it with a non-English account or
+    template would silently narrate the wrong language over the visuals.
+    """
+    normalized_language = str(language or "").strip().lower()
+    if str(provider or "").strip().lower() == "kittentts" and normalized_language and normalized_language != "english":
+        return (
+            f"KittenTTS는 영어만 지원합니다 (요청 언어: {language}). "
+            "tts_provider를 gemini로 변경하거나 언어를 English로 설정하세요."
+        )
+    return None
+
+
 class TTS:
     def __init__(self, provider: Optional[str] = None) -> None:
         self._provider = str(provider or get_tts_provider()).strip().lower()

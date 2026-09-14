@@ -26,7 +26,7 @@ from cache import update_account
 from ui.account_dialog import AccountDialog
 from ui.job_dialog import JobDialog
 from ui.model_picker import ensure_model_selected
-from ui.platforms import PLATFORMS, Platform, template_choices
+from ui.platforms import PLATFORMS, Platform, template_link_choices
 from ui.workers import UploadWorker, VideoWorker
 
 
@@ -253,7 +253,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "선택 필요", "먼저 계정을 선택해 주세요.")
             return
 
-        choices = template_choices()
+        choices = template_link_choices()
         labels = [label for label, _ in choices]
         current = next(
             (i for i, (_, value) in enumerate(choices) if value == account.get("template_id", "")), 0

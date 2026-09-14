@@ -109,6 +109,34 @@ def test_account_dialog_renders_template_choice(qapp, store):
     assert dialog.payload()["template_id"] == "t1"
 
 
+def test_unique_template_labels_disambiguates_duplicate_names():
+    from ui.platforms import unique_template_labels
+
+    templates_list = [
+        {"id": "11111111-aaaa", "name": "money"},
+        {"id": "22222222-bbbb", "name": "money"},
+    ]
+    choices = unique_template_labels(templates_list)
+
+    assert choices[0] == ("사용 안 함", "")
+    labels = [label for label, _ in choices]
+    assert len(labels) == len(set(labels))
+    assert choices[1] == ("money (11111111)", "11111111-aaaa")
+    assert choices[2] == ("money (22222222)", "22222222-bbbb")
+
+
+def test_unique_template_labels_disambiguates_reserved_name():
+    from ui.platforms import unique_template_labels
+
+    templates_list = [{"id": "33333333-cccc", "name": "사용 안 함"}]
+    choices = unique_template_labels(templates_list)
+
+    assert choices[0] == ("사용 안 함", "")
+    assert choices[1] == ("사용 안 함 (33333333)", "33333333-cccc")
+    labels = [label for label, _ in choices]
+    assert len(labels) == len(set(labels))
+
+
 def test_templates_platform_rows_and_remove_warning(qapp, store, monkeypatch):
     templates.add_template({"id": "t1", "name": "money", "source_urls": ["a", "b"]})
     import ui.platforms as platforms

@@ -73,6 +73,28 @@ def template_choices() -> List[tuple]:
     return [("사용 안 함", "")] + [(t.get("name", ""), t.get("id", "")) for t in get_templates()]
 
 
+def unique_template_labels(templates: List[dict]) -> List[tuple]:
+    """
+    Pure label-building helper for the "템플릿 연결" dialog.
+
+    QInputDialog.getItem returns only the chosen label text, so plain
+    template names must stay unique there — otherwise two templates sharing
+    a name (or a template literally named "사용 안 함") would resolve to the
+    wrong id via a first-match label lookup. Every real template gets an id
+    suffix so its label can never collide with another template's or with
+    the unlink placeholder.
+    """
+    choices = [("사용 안 함", "")]
+    for t in templates:
+        template_id = t.get("id", "")
+        choices.append((f"{t.get('name', '')} ({template_id[:8]})", template_id))
+    return choices
+
+
+def template_link_choices() -> List[tuple]:
+    return unique_template_labels(get_templates())
+
+
 def _youtube_rows() -> List[dict]:
     names = {t.get("id"): t.get("name", "") for t in get_templates()}
     return [

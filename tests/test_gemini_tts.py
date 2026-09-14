@@ -3,7 +3,7 @@ import wave
 import pytest
 
 import classes.Tts as tts_module
-from classes.Tts import TTS
+from classes.Tts import TTS, unsupported_language_reason
 from gemini_client import GeminiError
 from gemini_tts import build_tts_payload, synthesize_gemini
 
@@ -74,3 +74,19 @@ def test_tts_gemini_provider_delegates_with_style(monkeypatch, tmp_path):
 def test_tts_rejects_unknown_provider():
     with pytest.raises(ValueError, match="tts_provider"):
         TTS(provider="bogus")
+
+
+def test_unsupported_language_reason_blocks_kittentts_non_english():
+    reason = unsupported_language_reason("kittentts", "korean")
+    assert reason is not None
+    assert "영어" in reason
+
+
+def test_unsupported_language_reason_allows_kittentts_english():
+    assert unsupported_language_reason("kittentts", "english") is None
+    assert unsupported_language_reason("kittentts", "English ") is None
+    assert unsupported_language_reason("kittentts", "") is None
+
+
+def test_unsupported_language_reason_allows_gemini_any_language():
+    assert unsupported_language_reason("gemini", "korean") is None
