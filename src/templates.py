@@ -43,7 +43,8 @@ def get_templates() -> List[dict]:
             return []
     if not isinstance(data, dict):
         return []
-    return data.get("templates", [])
+    templates = data.get("templates", [])
+    return templates if isinstance(templates, list) else []
 
 
 def _save_templates(items: List[dict]) -> None:
@@ -244,6 +245,7 @@ def run_template_pipeline(
     synthesize_fn: Callable[[List[dict], str], dict],
     on_progress: Callable[[str, int], None],
     is_cancelled: Callable[[], bool],
+    on_failure: Optional[Callable[[str], None]] = None,
 ) -> Tuple[dict, List[str]]:
     """
     Analyzes every URL, skipping failures, then synthesizes one template.
@@ -266,7 +268,10 @@ def run_template_pipeline(
         try:
             analyses.append(analyze_fn(url))
         except Exception as exc:
-            failures.append(f"{url} — {exc}")
+            line = f"{url} — {exc}"
+            failures.append(line)
+            if on_failure is not None:
+                on_failure(line)
 
     if not analyses:
         raise RuntimeError("모든 레퍼런스 분석에 실패했습니다:\n" + "\n".join(failures))

@@ -53,6 +53,11 @@ def test_get_templates_tolerates_corrupt_file(store):
     assert get_templates() == []
 
 
+def test_get_templates_tolerates_non_list_templates_field(store):
+    store.write_text('{"templates": "oops"}', encoding="utf-8")
+    assert get_templates() == []
+
+
 def test_aggregate_sentence_counts_median():
     assert aggregate_sentence_counts([5]) == 5
     assert aggregate_sentence_counts([4, 6, 9]) == 6

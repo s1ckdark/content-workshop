@@ -70,7 +70,7 @@ def test_synthesize_requires_analyses():
         synthesize([], "x")
 
 
-def _pipeline(urls, analyze_fn, cancelled=lambda: False):
+def _pipeline(urls, analyze_fn, cancelled=lambda: False, on_failure=None):
     progress = []
     result = run_template_pipeline(
         urls,
@@ -79,6 +79,7 @@ def _pipeline(urls, analyze_fn, cancelled=lambda: False):
         synthesize_fn=lambda analyses, name: {"name": name, "count": len(analyses)},
         on_progress=lambda label, pct: progress.append((label, pct)),
         is_cancelled=cancelled,
+        on_failure=on_failure,
     )
     return result, progress
 
@@ -95,6 +96,22 @@ def test_pipeline_skips_failed_urls():
     assert len(failures) == 1 and "bad" in failures[0] and "private video" in failures[0]
     assert progress[-1] == ("템플릿 합성 중", 85)
     assert [p for _, p in progress] == sorted(p for _, p in progress)
+
+
+def test_pipeline_calls_on_failure_immediately_per_url():
+    def analyze_fn(url):
+        if url == "bad":
+            raise GeminiError("private video")
+        return {"url": url}
+
+    reported = []
+    (template, failures), _progress = _pipeline(
+        ["good1", "bad", "good2"], analyze_fn, on_failure=reported.append
+    )
+
+    assert template == {"name": "name", "count": 2}
+    assert reported == failures
+    assert len(reported) == 1 and "bad" in reported[0] and "private video" in reported[0]
 
 
 def test_pipeline_raises_when_all_fail():

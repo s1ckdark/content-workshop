@@ -283,13 +283,14 @@ class TemplateWorker(QObject):
             return
 
         try:
-            template, failures = run_template_pipeline(
+            template, _failures = run_template_pipeline(
                 self._urls,
                 self._name,
                 analyze_fn=self._analyze,
                 synthesize_fn=synthesize,
                 on_progress=self.progress.emit,
                 is_cancelled=lambda: self._cancelled,
+                on_failure=lambda line: self.log.emit(f"건너뜀: {line}"),
             )
         except TemplateCancelled:
             self.failed.emit("사용자가 취소했습니다.")
@@ -298,12 +299,19 @@ class TemplateWorker(QObject):
             self.failed.emit(f"{type(exc).__name__}: {exc}")
             return
 
-        for failure in failures:
-            self.log.emit(f"건너뜀: {failure}")
+        if self._cancelled:
+            self.failed.emit("사용자가 취소했습니다.")
+            return
+
         self.progress.emit("완료", 100)
         self.finished.emit(template)
 
     def _analyze(self, url: str) -> dict:
         result = analyze(url)
-        self.log.emit(f"분석 완료: {url} — {result.get('topic', '')}")
+        self.log.emit(
+            f"분석 완료: {url} — 주제: {result.get('topic', '')} / "
+            f"훅 유형: {result.get('hook_type', '')} / "
+            f"문장 수: {result.get('sentence_count', '')} / "
+            f"톤: {result.get('tone', '')}"
+        )
         return result
