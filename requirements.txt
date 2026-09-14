@@ -13,3 +13,4 @@ faster-whisper
 srt_equalizer
 platformdirs
 PySide6
+requests
