@@ -354,3 +354,39 @@ def get_script_sentence_length() -> int:
     if config_json.get("script_sentence_length") is not None:
         return config_json["script_sentence_length"]
     return 4
+
+def get_reference_analysis_model() -> str:
+    """
+    Gets the Gemini model used to analyze reference Shorts and synthesize templates.
+
+    Returns:
+        model (str): Model name
+    """
+    return load_config().get("reference_analysis_model") or "gemini-3.8-flash"
+
+def get_tts_provider() -> str:
+    """
+    Gets the TTS provider.
+
+    Returns:
+        provider (str): "kittentts" or "gemini"
+    """
+    return str(load_config().get("tts_provider") or "kittentts").strip().lower()
+
+def get_gemini_tts_model() -> str:
+    """
+    Gets the Gemini TTS model name.
+
+    Returns:
+        model (str): Model name
+    """
+    return load_config().get("gemini_tts_model") or "gemini-3.1-flash-tts-preview"
+
+def get_gemini_tts_voice() -> str:
+    """
+    Gets the Gemini TTS prebuilt voice name.
+
+    Returns:
+        voice (str): Voice name
+    """
+    return load_config().get("gemini_tts_voice") or "Kore"
