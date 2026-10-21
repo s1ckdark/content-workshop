@@ -21,9 +21,9 @@ YouTube 기능은 아래 순서로 동작합니다.
 2. 짧은 스크립트 생성
 3. 제목과 설명 생성
 4. 이미지 프롬프트 생성
-5. Gemini 이미지 API로 장면 이미지 생성
-6. KittenTTS로 음성 생성
-7. Whisper 또는 AssemblyAI로 자막 생성
+5. OpenRouter의 Gemini 이미지 모델로 장면 이미지 생성
+6. OpenRouter의 Gemini TTS로 한국어 포함 내레이션 생성
+7. OpenRouter의 Whisper로 타임스탬프가 있는 자막 생성
 8. MoviePy로 세로 영상 합성
 9. Playwright로 YouTube Studio 업로드
 
@@ -44,22 +44,30 @@ python3 src/main.py
 
 - Python 3.12
 - Chrome 또는 Chromium 기반 프로필
-- Ollama
+- OpenRouter API 키 (`OPENROUTER_API_KEY`)
 - ImageMagick
-- YouTube 생성 기능 사용 시 Gemini API 키
 - 로컬 리드 수집 기능 사용 시 Go
 
 ## 설정
 
 주요 설정은 `config.json`에서 관리합니다.
 
-- `ollama_model`: 텍스트 생성에 사용할 Ollama 모델
-- `nanobanana2_api_key`: Gemini 이미지 API 키
+- `llm_provider`: 텍스트 생성 제공자 (`openrouter`, `ollama`, `lmstudio`, `openai_compatible`)
+- `llm_model`: 사용할 모델 ID (기본 예시: `google/gemini-2.5-flash`)
+- `OPENROUTER_API_KEY`: OpenRouter 인증용 환경변수
+- `image_model`: 이미지 모델 ID
+- `openrouter_tts_model` / `openrouter_tts_voice`: 음성 모델과 목소리
 - `browser_profile`: 업로드/게시용 Chrome/Chromium user data dir
 - `zip_url`: 배경음악 ZIP URL
-- `stt_provider`: `local_whisper` 또는 `third_party_assemblyai`
+- `stt_provider`: 기본 `openrouter`, 선택적으로 `local_whisper`
 
 상세 항목은 [docs/Configuration.md](docs/Configuration.md)를 참고하면 됩니다.
+
+기본 설정은 텍스트·이미지·TTS·자막 인식에 OpenRouter를 사용합니다.
+앱과 preflight를 실행하는 터미널에 `OPENROUTER_API_KEY`를 설정하세요.
+기능 브랜치의 레퍼런스 영상 분석·템플릿 합성도 같은 키를 사용합니다.
+별도의 Google Gemini 키나 AssemblyAI 키는 필요하지 않습니다.
+텍스트의 로컬 Ollama/LM Studio, 오디오의 로컬 KittenTTS/Whisper는 명시적으로 선택할 때만 사용합니다.
 
 ## 스케줄러
 
@@ -68,7 +76,9 @@ python3 src/main.py
 
 ## 프로젝트 구조
 
-- `src/main.py`: CLI 진입점
+- `src/main.py`: PySide6 데스크톱 앱 진입점
+- `src/openrouter_client.py`: OpenRouter 인증·요청·응답 처리
+- `src/openrouter_media.py`: 이미지·음성·자막 생성
 - `src/classes/YouTube.py`: Shorts 생성 및 업로드
 - `src/classes/Twitter.py`: Twitter/X 자동 포스팅
 - `src/classes/AFM.py`: 제휴 문구 생성

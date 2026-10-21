@@ -8,7 +8,6 @@ playwright
 ollama
 moviepy
 Pillow>=10.0.0
-assemblyai
 faster-whisper
 srt_equalizer
 platformdirs

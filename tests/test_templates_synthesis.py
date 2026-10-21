@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from gemini_client import GeminiError
+from openrouter_client import OpenRouterError
 from templates import TemplateCancelled, run_template_pipeline, synthesize
 
 SYNTH = {
@@ -41,9 +41,9 @@ def test_synthesize_builds_full_template(fake_post, analysis_factory):
     assert "Rent vs buy" in template["avoid"]
     assert template["analyses"] == analyses
 
-    sent_prompt = fake_post.calls[0]["json"]["contents"][0]["parts"][0]["text"]
+    sent_prompt = fake_post.calls[0]["json"]["messages"][0]["content"]
     assert "Rent vs buy" in sent_prompt
-    assert fake_post.calls[0]["url"].endswith("/models/analysis-model:generateContent")
+    assert fake_post.calls[0]["url"].endswith("/chat/completions")
 
 
 def test_synthesize_retries_once_then_succeeds(fake_post, analysis_factory):
@@ -60,7 +60,7 @@ def test_synthesize_retries_http_error_then_raises(fake_post, analysis_factory):
     fake_post.queue.append(fake_post.Response(status_code=500, text="err"))
     fake_post.queue.append(fake_post.Response(body=fake_post.text_body('{"niche": "only"}')))
 
-    with pytest.raises(GeminiError):
+    with pytest.raises(OpenRouterError):
         synthesize([analysis_factory()], "x")
     assert len(fake_post.calls) == 2
 
@@ -87,7 +87,7 @@ def _pipeline(urls, analyze_fn, cancelled=lambda: False, on_failure=None):
 def test_pipeline_skips_failed_urls():
     def analyze_fn(url):
         if url == "bad":
-            raise GeminiError("private video")
+            raise OpenRouterError("private video")
         return {"url": url}
 
     (template, failures), progress = _pipeline(["good1", "bad", "good2"], analyze_fn)
@@ -101,7 +101,7 @@ def test_pipeline_skips_failed_urls():
 def test_pipeline_calls_on_failure_immediately_per_url():
     def analyze_fn(url):
         if url == "bad":
-            raise GeminiError("private video")
+            raise OpenRouterError("private video")
         return {"url": url}
 
     reported = []
@@ -116,7 +116,7 @@ def test_pipeline_calls_on_failure_immediately_per_url():
 
 def test_pipeline_raises_when_all_fail():
     def analyze_fn(url):
-        raise GeminiError("nope")
+        raise OpenRouterError("nope")
 
     with pytest.raises(RuntimeError, match="모든 레퍼런스"):
         _pipeline(["a", "b"], analyze_fn)

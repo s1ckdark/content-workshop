@@ -4,10 +4,9 @@ Shared pytest setup.
 - Puts src/ first on sys.path so bare imports work and config.ROOT_DIR
   resolves to the project root (it is computed from sys.path[0]).
 - Injects an in-memory config so tests never read config.json.
-- Replaces requests.post for Gemini calls so tests never hit the network.
+- Replaces requests.post for OpenRouter calls so tests never hit the network.
 """
 
-import base64
 import json
 import os
 import sys
@@ -28,13 +27,14 @@ TEST_CONFIG = {
     "font": "bold_font.ttf",
     "imagemagick_path": "/usr/bin/convert",
     "script_sentence_length": 4,
-    "nanobanana2_api_base_url": "https://example.test/v1beta",
-    "nanobanana2_api_key": "test-key",
+    "llm_provider": "openrouter",
+    "llm_base_url": "https://example.test/api/v1",
+    "llm_api_key": "test-key",
     "reference_analysis_model": "analysis-model",
-    "tts_provider": "gemini",
+    "tts_provider": "openrouter",
     "tts_voice": "Jasper",
-    "gemini_tts_model": "tts-model",
-    "gemini_tts_voice": "Kore",
+    "openrouter_tts_model": "tts-model",
+    "openrouter_tts_voice": "Kore",
 }
 
 
@@ -55,31 +55,12 @@ class FakeResponse:
 
 
 def _text_body(text: str) -> dict:
-    return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
-
-
-def _audio_body(pcm: bytes) -> dict:
-    return {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "inlineData": {
-                                "mimeType": "audio/L16;codec=pcm;rate=24000",
-                                "data": base64.b64encode(pcm).decode("ascii"),
-                            }
-                        }
-                    ]
-                }
-            }
-        ]
-    }
+    return {"choices": [{"message": {"content": text}}]}
 
 
 @pytest.fixture
 def fake_post(monkeypatch):
-    import gemini_client
+    import openrouter_client
 
     calls: list[dict] = []
     queue: list = []
@@ -87,19 +68,18 @@ def fake_post(monkeypatch):
     def _post(url, headers=None, json=None, timeout=None):
         calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
         if not queue:
-            raise AssertionError(f"Unexpected Gemini call to {url}")
+            raise AssertionError(f"Unexpected OpenRouter call to {url}")
         item = queue.pop(0)
         if isinstance(item, Exception):
             raise item
         return item
 
-    monkeypatch.setattr(gemini_client.requests, "post", _post)
+    monkeypatch.setattr(openrouter_client.requests, "post", _post)
     return SimpleNamespace(
         calls=calls,
         queue=queue,
         Response=FakeResponse,
         text_body=_text_body,
-        audio_body=_audio_body,
     )
 
 

@@ -8,7 +8,7 @@ from classes.ReferenceAnalyzer import (
     normalize_youtube_url,
     parse_url_lines,
 )
-from gemini_client import GeminiError
+from openrouter_client import OpenRouterError
 
 VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
@@ -71,10 +71,12 @@ def test_analyze_sends_video_uri_and_returns_analysis(fake_post, analysis_factor
     result = analyze("https://youtube.com/shorts/dQw4w9WgXcQ")
 
     call = fake_post.calls[0]
-    assert call["url"].endswith("/models/analysis-model:generateContent")
-    parts = call["json"]["contents"][0]["parts"]
-    assert parts[0] == {"file_data": {"file_uri": VIDEO}}
-    assert "responseFormat" in call["json"]["generationConfig"]
+    assert call["url"].endswith("/chat/completions")
+    assert call["json"]["model"] == "analysis-model"
+    parts = call["json"]["messages"][0]["content"]
+    assert parts[1] == {"type": "video_url", "video_url": {"url": VIDEO}}
+    assert call["json"]["response_format"]["type"] == "json_schema"
+    assert call["json"]["provider"]["only"] == ["google-ai-studio"]
     assert result["url"] == VIDEO
     assert all(key in result for key in REQUIRED_KEYS)
 
@@ -93,7 +95,7 @@ def test_analyze_raises_after_second_mismatch(fake_post):
     fake_post.queue.append(fake_post.Response(body=fake_post.text_body("oops")))
     fake_post.queue.append(fake_post.Response(body=fake_post.text_body('{"topic": "only"}')))
 
-    with pytest.raises(GeminiError, match="스키마"):
+    with pytest.raises(OpenRouterError, match="스키마"):
         analyze(VIDEO)
     assert len(fake_post.calls) == 2
 
@@ -101,12 +103,12 @@ def test_analyze_raises_after_second_mismatch(fake_post):
 def test_analyze_does_not_retry_http_errors(fake_post):
     fake_post.queue.append(fake_post.Response(status_code=400, text="private video"))
 
-    with pytest.raises(GeminiError, match="400"):
+    with pytest.raises(OpenRouterError, match="400"):
         analyze(VIDEO)
     assert len(fake_post.calls) == 1
 
 
 def test_analyze_rejects_invalid_url_without_calling(fake_post):
-    with pytest.raises(GeminiError, match="YouTube URL"):
+    with pytest.raises(OpenRouterError, match="YouTube URL"):
         analyze("https://vimeo.com/1")
     assert fake_post.calls == []

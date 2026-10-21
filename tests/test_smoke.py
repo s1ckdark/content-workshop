@@ -8,4 +8,4 @@ def test_root_dir_is_project_root():
 
 
 def test_config_is_injected():
-    assert config.get_nanobanana2_api_key() == "test-key"
+    assert config.get_openrouter_api_key() == "test-key"

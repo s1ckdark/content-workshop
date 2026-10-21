@@ -43,14 +43,16 @@ Two service categories use a string-based dispatch pattern configured in `config
 
 | Category | Config key | Options |
 |---|---|---|
-| LLM | `ollama_model` | Ollama (via `ollama` Python SDK). If empty, user picks from available models at startup. |
-| Image gen | — | `nanobanana2` (Gemini image API) |
-| STT | `stt_provider` | `local_whisper`, `third_party_assemblyai` |
+| LLM | `llm_provider`, `llm_model` | OpenRouter by default; optional Ollama or OpenAI-compatible local servers. |
+| Image gen | `image_model` | OpenRouter Image API, Gemini by default. |
+| STT | `stt_provider` | `openrouter` (default), `local_whisper` |
 
-LLM always uses the local Ollama server. Image generation always uses Nano Banana 2.
+The default text, image, narration, transcription and reference-analysis paths all use OpenRouter with OPENROUTER_API_KEY. See docs/Configuration.md for per-task models. Local text/TTS/STT providers are explicit opt-ins.
 
 ### Key Modules
-- **`src/llm_provider.py`** — unified `generate_text(prompt)` function using the Ollama Python SDK
+- **`src/openrouter_client.py`** — authenticated OpenRouter requests and structured responses
+- **`src/openrouter_media.py`** — images, speech-to-WAV, timestamped SRT captions
+- **`src/llm_provider.py`** — unified text generation through the configured provider
 - **`src/config.py`** — 30+ getter functions reading from `config.json`, cached once per process via `load_config()` (`_CONFIG_CACHE`; pass `force_reload=True` to re-read from disk). `ROOT_DIR` = project root, computed as `os.path.dirname(sys.path[0])`
 - **`src/cache.py`** — JSON file persistence in `.mp/` directory (accounts, videos, posts, products)
 - **`src/constants.py`** — menu strings, Selenium selectors (YouTube Studio, X.com, Amazon)
@@ -58,7 +60,7 @@ LLM always uses the local Ollama server. Image generation always uses Nano Banan
 - **`src/classes/Twitter.py`** — Selenium automation against x.com
 - **`src/classes/AFM.py`** — Amazon scraping + LLM pitch generation
 - **`src/classes/LeadScraper.py`** — Google Maps scraper (requires Go) + phone normalization; exposes `get_leads(niche=...)` pull API for other pipelines
-- **`src/classes/Tts.py`** — `TTS` provider dispatch (`tts_provider`: `kittentts` or `gemini`); `unsupported_language_reason()` blocks kittentts (English-only) from narrating a non-English account/template
+- **`src/classes/Tts.py`** — `TTS` provider dispatch (`tts_provider`: `openrouter` or `kittentts`); `unsupported_language_reason()` blocks kittentts (English-only) from narrating a non-English account/template
 - **`src/templates.py`** — reference-based YouTube Shorts format templates: analyzes reference URLs via Gemini, synthesizes/stores a reusable template (niche, hook pattern, tone, visual style, sentence count) in `.mp/templates.json`, and loads a YouTube account's linked template for the generation pipeline
 
 ### Data Storage
@@ -77,7 +79,7 @@ All config lives in `config.json` at the project root. See `config.example.json`
 - **ImageMagick** — required for MoviePy subtitle rendering (`imagemagick_path`)
 - **Firefox profile** — must be pre-logged-in to target platforms (`firefox_profile`)
 - **Ollama** — for LLM text generation (via `ollama` Python SDK)
-- **Nano Banana 2** — for image generation (Gemini image API)
+- **OpenRouter** — one key for text, image generation, reference analysis, TTS and caption transcription
 - **Go** — only needed for LeadScraper (Google Maps scraper)
 
 ## Contributing

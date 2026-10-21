@@ -24,7 +24,7 @@ def _connect(worker):
 
 
 def test_run_fails_immediately_without_api_key(qapp, monkeypatch):
-    monkeypatch.setattr(workers, "get_nanobanana2_api_key", lambda: "")
+    monkeypatch.setattr(workers, "get_openrouter_api_key", lambda: "")
     worker = TemplateWorker(["https://www.youtube.com/watch?v=AAAAAAAAAAA"], "name")
     signals = _connect(worker)
 
@@ -36,7 +36,7 @@ def test_run_fails_immediately_without_api_key(qapp, monkeypatch):
 
 
 def test_run_skips_failed_url_and_finishes(qapp, monkeypatch):
-    monkeypatch.setattr(workers, "get_nanobanana2_api_key", lambda: "test-key")
+    monkeypatch.setattr(workers, "get_openrouter_api_key", lambda: "test-key")
 
     def fake_analyze(url):
         if url == "bad":
@@ -58,7 +58,7 @@ def test_run_skips_failed_url_and_finishes(qapp, monkeypatch):
 
 
 def test_run_reports_cancel(qapp, monkeypatch):
-    monkeypatch.setattr(workers, "get_nanobanana2_api_key", lambda: "test-key")
+    monkeypatch.setattr(workers, "get_openrouter_api_key", lambda: "test-key")
     monkeypatch.setattr(workers, "analyze", lambda url: {"url": url})
 
     def fake_synthesize(analyses, name):

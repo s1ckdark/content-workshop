@@ -2,6 +2,7 @@ import json
 import os
 import sys
 
+import llm_settings
 import srt_equalizer
 from termcolor import colored
 
@@ -113,7 +114,7 @@ def get_llm_provider() -> str:
     Returns:
         provider (str): Provider name
     """
-    return str(load_config().get("llm_provider", "ollama")).strip().lower()
+    return llm_settings.provider(load_config())
 
 def get_llm_base_url() -> str:
     """
@@ -122,8 +123,7 @@ def get_llm_base_url() -> str:
     Returns:
         url (str): Base URL
     """
-    config = load_config()
-    return str(config.get("llm_base_url") or config.get("ollama_base_url", "http://127.0.0.1:11434")).rstrip("/")
+    return llm_settings.base_url(load_config())
 
 def get_llm_model() -> str:
     """
@@ -132,8 +132,7 @@ def get_llm_model() -> str:
     Returns:
         model (str): Model name
     """
-    config = load_config()
-    return str(config.get("llm_model") or config.get("ollama_model", "")).strip()
+    return llm_settings.model(load_config())
 
 def get_llm_api_key() -> str:
     """
@@ -142,8 +141,7 @@ def get_llm_api_key() -> str:
     Returns:
         key (str): API key, if configured
     """
-    configured = str(load_config().get("llm_api_key", "")).strip()
-    return configured or os.environ.get("OPENAI_API_KEY", "") or os.environ.get("LLM_API_KEY", "")
+    return llm_settings.api_key(load_config())
 
 def get_twitter_language() -> str:
     """
@@ -154,45 +152,42 @@ def get_twitter_language() -> str:
     """
     return load_config()["twitter_language"]
 
-def get_nanobanana2_api_base_url() -> str:
-    """
-    Gets the Nano Banana 2 (Gemini image) API base URL.
+def get_openrouter_api_key() -> str:
+    return llm_settings.openrouter_api_key(load_config())
 
-    Returns:
-        url (str): API base URL
-    """
-    return load_config().get(
-        "nanobanana2_api_base_url",
-        "https://generativelanguage.googleapis.com/v1beta",
-    )
 
-def get_nanobanana2_api_key() -> str:
-    """
-    Gets the Nano Banana 2 API key.
+def get_openrouter_base_url() -> str:
+    return llm_settings.openrouter_base_url(load_config())
 
-    Returns:
-        key (str): API key
-    """
-    configured = load_config().get("nanobanana2_api_key", "")
-    return configured or os.environ.get("GEMINI_API_KEY", "")
 
-def get_nanobanana2_model() -> str:
-    """
-    Gets the Nano Banana 2 model name.
+def get_image_model() -> str:
+    return llm_settings.image_model(load_config())
 
-    Returns:
-        model (str): Model name
-    """
-    return load_config().get("nanobanana2_model", "gemini-3.1-flash-image-preview")
 
-def get_nanobanana2_aspect_ratio() -> str:
-    """
-    Gets the aspect ratio for Nano Banana 2 image generation.
+def get_image_aspect_ratio() -> str:
+    return llm_settings.image_aspect_ratio(load_config())
 
-    Returns:
-        ratio (str): Aspect ratio
-    """
-    return load_config().get("nanobanana2_aspect_ratio", "9:16")
+
+def get_reference_analysis_model() -> str:
+    return llm_settings.reference_model(load_config())
+
+
+def get_tts_provider() -> str:
+    provider = str(load_config().get("tts_provider") or "openrouter").strip().lower()
+    return "openrouter" if provider == "gemini" else provider
+
+
+def get_openrouter_tts_model() -> str:
+    return llm_settings.tts_model(load_config())
+
+
+def get_openrouter_tts_voice() -> str:
+    return llm_settings.tts_voice(load_config())
+
+
+def get_openrouter_stt_model() -> str:
+    return llm_settings.stt_model(load_config())
+
 
 def get_threads() -> int:
     """
@@ -257,15 +252,6 @@ def get_tts_voice() -> str:
     """
     return load_config().get("tts_voice", "Jasper")
 
-def get_assemblyai_api_key() -> str:
-    """
-    Gets the AssemblyAI API key.
-
-    Returns:
-        key (str): The AssemblyAI API key
-    """
-    return load_config()["assembly_ai_api_key"]
-
 def get_stt_provider() -> str:
     """
     Gets the configured STT provider.
@@ -273,7 +259,7 @@ def get_stt_provider() -> str:
     Returns:
         provider (str): The STT provider
     """
-    return load_config().get("stt_provider", "local_whisper")
+    return load_config().get("stt_provider", "openrouter")
 
 def get_whisper_model() -> str:
     """
@@ -354,39 +340,3 @@ def get_script_sentence_length() -> int:
     if config_json.get("script_sentence_length") is not None:
         return config_json["script_sentence_length"]
     return 4
-
-def get_reference_analysis_model() -> str:
-    """
-    Gets the Gemini model used to analyze reference Shorts and synthesize templates.
-
-    Returns:
-        model (str): Model name
-    """
-    return load_config().get("reference_analysis_model") or "gemini-3.8-flash"
-
-def get_tts_provider() -> str:
-    """
-    Gets the TTS provider.
-
-    Returns:
-        provider (str): "kittentts" or "gemini"
-    """
-    return str(load_config().get("tts_provider") or "kittentts").strip().lower()
-
-def get_gemini_tts_model() -> str:
-    """
-    Gets the Gemini TTS model name.
-
-    Returns:
-        model (str): Model name
-    """
-    return load_config().get("gemini_tts_model") or "gemini-3.1-flash-tts-preview"
-
-def get_gemini_tts_voice() -> str:
-    """
-    Gets the Gemini TTS prebuilt voice name.
-
-    Returns:
-        voice (str): Voice name
-    """
-    return load_config().get("gemini_tts_voice") or "Kore"

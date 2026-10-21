@@ -2,15 +2,17 @@ import ollama
 import requests
 import re
 
-from config import get_llm_api_key, get_llm_base_url, get_llm_provider
-
-OPENAI_COMPATIBLE_PROVIDERS = {"lmstudio", "openai_compatible", "openai-compatible"}
+from config import get_llm_api_key, get_llm_base_url, get_llm_model, get_llm_provider
+from llm_settings import OPENAI_COMPATIBLE_PROVIDERS, SUPPORTED_PROVIDERS
 
 _selected_model: str | None = None
 
 
 def _provider() -> str:
-    return get_llm_provider()
+    provider = get_llm_provider()
+    if provider not in SUPPORTED_PROVIDERS:
+        raise ValueError(f"Unsupported llm_provider: {provider}")
+    return provider
 
 
 def _client() -> ollama.Client:
@@ -25,6 +27,8 @@ def _openai_base_url() -> str:
 def _openai_headers() -> dict:
     headers = {"Content-Type": "application/json"}
     api_key = get_llm_api_key()
+    if _provider() == "openrouter" and not api_key:
+        raise RuntimeError("OpenRouter requires OPENROUTER_API_KEY or config.json llm_api_key.")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     return headers
@@ -33,7 +37,7 @@ def _openai_headers() -> dict:
 def _extract_openai_content(payload: dict) -> str:
     choices = payload.get("choices", [])
     if not choices:
-        raise RuntimeError(f"No choices returned from LLM provider. Response: {payload}")
+        raise RuntimeError("No choices returned from LLM provider.")
 
     message = choices[0].get("message", {})
     content = message.get("content", "")
@@ -48,7 +52,7 @@ def _extract_openai_content(payload: dict) -> str:
                 parts.append(str(item.get("text", "")))
         return _sanitize_text("".join(parts))
 
-    return _sanitize_text(str(content))
+    raise RuntimeError("LLM provider returned no text content.")
 
 
 def _sanitize_text(text: str) -> str:
@@ -112,7 +116,7 @@ def generate_text(prompt: str, model_name: str = None) -> str:
     Returns:
         response (str): Generated text
     """
-    model = model_name or _selected_model
+    model = model_name or _selected_model or get_llm_model()
     if not model:
         raise RuntimeError(
             "No LLM model selected. Call select_model() first or pass model_name."

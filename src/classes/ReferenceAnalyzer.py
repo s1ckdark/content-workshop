@@ -1,5 +1,5 @@
 """
-Analyzes a public YouTube Short through Gemini video understanding and
+Analyzes a public YouTube Short through OpenRouter video understanding and
 returns a structured description of its format (hook, pacing, tone, visuals).
 The video itself is never downloaded.
 """
@@ -9,10 +9,10 @@ from typing import List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from config import get_reference_analysis_model
-from gemini_client import (
-    GeminiError,
+from openrouter_client import (
+    OpenRouterError,
     generate_content,
-    json_generation_config,
+    json_response_format,
     parse_json_text,
     response_text,
 )
@@ -129,8 +129,13 @@ def parse_url_lines(text: str) -> Tuple[List[str], List[str]]:
 
 def build_analysis_payload(url: str) -> dict:
     return {
-        "contents": [{"parts": [{"file_data": {"file_uri": url}}, {"text": ANALYSIS_PROMPT}]}],
-        "generationConfig": json_generation_config(ANALYSIS_SCHEMA),
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": ANALYSIS_PROMPT},
+            {"type": "video_url", "video_url": {"url": url}},
+        ]}],
+        "response_format": json_response_format(ANALYSIS_SCHEMA, "reference_analysis"),
+        # Public YouTube URLs are supported on AI Studio, not Vertex.
+        "provider": {"only": ["google-ai-studio"], "allow_fallbacks": False, "require_parameters": True},
     }
 
 
@@ -146,23 +151,23 @@ def analyze(url: str, retries: int = 1) -> dict:
     malformed or schema-mismatched responses are retried `retries` times.
 
     Raises:
-        GeminiError: Invalid URL, HTTP failure or repeated schema mismatch.
+        OpenRouterError: Invalid URL, HTTP failure or repeated schema mismatch.
     """
     normalized = normalize_youtube_url(url)
     if normalized is None:
-        raise GeminiError(f"YouTube URL이 아닙니다: {url}")
+        raise OpenRouterError(f"YouTube URL이 아닙니다: {url}")
 
     payload = build_analysis_payload(normalized)
-    last_error: GeminiError = GeminiError("분석 결과가 스키마와 맞지 않습니다.")
+    last_error: OpenRouterError = OpenRouterError("분석 결과가 스키마와 맞지 않습니다.")
     for _ in range(retries + 1):
         body = generate_content(get_reference_analysis_model(), payload)
         try:
             data = parse_json_text(response_text(body))
-        except GeminiError:
-            last_error = GeminiError("분석 결과가 스키마와 맞지 않습니다 (JSON 파싱 실패).")
+        except OpenRouterError:
+            last_error = OpenRouterError("분석 결과가 스키마와 맞지 않습니다 (JSON 파싱 실패).")
             continue
         if validate_analysis(data):
             data["url"] = normalized
             return data
-        last_error = GeminiError("분석 결과가 스키마와 맞지 않습니다.")
+        last_error = OpenRouterError("분석 결과가 스키마와 맞지 않습니다.")
     raise last_error

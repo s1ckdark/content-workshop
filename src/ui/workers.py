@@ -3,7 +3,7 @@ Background workers for long-running pipelines. Each worker is a QObject that
 moveToThread()s onto a QThread; JobDialog drives the lifecycle.
 
 Cancellation is cooperative — the worker checks self._cancelled between
-sub-steps. We can't kill MoviePy mid-encode or a Nano Banana 2 HTTP call
+sub-steps. We can't kill MoviePy mid-encode or a OpenRouter HTTP call
 that's already in flight, so cancel = "stop after the current step".
 """
 
@@ -15,7 +15,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from classes.ReferenceAnalyzer import analyze
 from classes.Tts import TTS, unsupported_language_reason
 from classes.YouTube import YouTube
-from config import ROOT_DIR, get_nanobanana2_api_key, get_tts_provider
+from config import ROOT_DIR, get_openrouter_api_key, get_tts_provider
 from templates import TemplateCancelled, load_account_template, run_template_pipeline, synthesize
 from utils import fetch_songs
 
@@ -130,7 +130,7 @@ class VideoWorker(QObject):
         self._image_loop()
 
         if not self._yt.images:
-            raise RuntimeError("생성된 이미지가 없습니다. Nano Banana 2 설정을 확인하세요.")
+            raise RuntimeError("생성된 이미지가 없습니다. OpenRouter 설정을 확인하세요.")
 
         self.progress.emit("음성 합성 (TTS)", 75)
         tts = TTS()
@@ -156,7 +156,7 @@ class VideoWorker(QObject):
     def _image_loop(self) -> None:
         """
         Per-image progress with cold-start weighting + one retry on None.
-        The first image is weighted 2× because Nano Banana 2 first-call latency
+        The first image is weighted 2× because OpenRouter first-call latency
         is consistently higher than steady-state.
         """
         prompts = self._yt.image_prompts
@@ -276,9 +276,9 @@ class TemplateWorker(QObject):
 
     @Slot()
     def run(self) -> None:
-        if not get_nanobanana2_api_key():
+        if not get_openrouter_api_key():
             self.failed.emit(
-                "Gemini API 키가 설정되지 않았습니다. config.json의 nanobanana2_api_key를 확인하세요."
+                "OpenRouter API 키가 설정되지 않았습니다. OPENROUTER_API_KEY를 확인하세요."
             )
             return
 

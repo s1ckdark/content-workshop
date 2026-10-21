@@ -13,10 +13,10 @@ from uuid import uuid4
 
 from cache import get_cache_path, write_json_atomic
 from config import get_reference_analysis_model
-from gemini_client import (
-    GeminiError,
+from openrouter_client import (
+    OpenRouterError,
     generate_content,
-    json_generation_config,
+    json_response_format,
     parse_json_text,
     response_text,
 )
@@ -187,8 +187,8 @@ def synthesize(analyses: List[dict], name: str, retries: int = 1) -> dict:
     """
     Builds a template from per-reference analyses.
 
-    Text fields come from one Gemini call (retried `retries` times on any
-    Gemini error or schema mismatch); numeric fields and the avoid list are
+    Text fields come from one OpenRouter call (retried on transient errors
+    or schema mismatch); numeric fields and the avoid list are
     computed locally.
     """
     if not analyses:
@@ -196,24 +196,26 @@ def synthesize(analyses: List[dict], name: str, retries: int = 1) -> dict:
 
     avoid = collect_avoid(analyses)
     payload = {
-        "contents": [{"parts": [{"text": build_synthesis_prompt(analyses, avoid)}]}],
-        "generationConfig": json_generation_config(SYNTHESIS_SCHEMA),
+        "messages": [{"role": "user", "content": build_synthesis_prompt(analyses, avoid)}],
+        "response_format": json_response_format(SYNTHESIS_SCHEMA, "format_template"),
     }
 
     data: Optional[dict] = None
-    last_error: GeminiError = GeminiError("합성 결과가 스키마와 맞지 않습니다.")
+    last_error: OpenRouterError = OpenRouterError("합성 결과가 스키마와 맞지 않습니다.")
     for _ in range(retries + 1):
         try:
             candidate = parse_json_text(
                 response_text(generate_content(get_reference_analysis_model(), payload))
             )
-        except GeminiError as exc:
+        except OpenRouterError as exc:
+            if not exc.retryable:
+                raise
             last_error = exc
             continue
         if _valid_synthesis(candidate):
             data = candidate
             break
-        last_error = GeminiError("합성 결과가 스키마와 맞지 않습니다.")
+        last_error = OpenRouterError("합성 결과가 스키마와 맞지 않습니다.")
     if data is None:
         raise last_error
 
