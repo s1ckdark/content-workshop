@@ -10,7 +10,7 @@ MoneyPrinterV2 (MPV2) is a Python 3.12 CLI tool that automates four online workf
 3. **Affiliate Marketing** — scrape Amazon product info, generate pitch, share on Twitter
 4. **Local Lead Collection** — scrape Google Maps (Go binary) for local businesses, normalize phone numbers, persist as a reusable JSON lead store for other pipelines to consume via `get_leads()`
 
-There is no web UI, no REST API, no test suite, no CI, and no linting config.
+The application uses a PySide6 desktop UI. Offline regression tests live under tests/ and run with venv/bin/python -m pytest.
 
 ## Running the Application
 
@@ -43,14 +43,16 @@ Two service categories use a string-based dispatch pattern configured in `config
 
 | Category | Config key | Options |
 |---|---|---|
-| LLM | `ollama_model` | Ollama (via `ollama` Python SDK). If empty, user picks from available models at startup. |
-| Image gen | — | `nanobanana2` (Gemini image API) |
-| STT | `stt_provider` | `local_whisper`, `third_party_assemblyai` |
+| LLM | `llm_provider`, `llm_model` | OpenRouter by default; optional Ollama or OpenAI-compatible local servers. |
+| Image gen | `image_model` | OpenRouter Image API, Gemini by default. |
+| STT | `stt_provider` | `openrouter` (default), `local_whisper` |
 
-LLM always uses the local Ollama server. Image generation always uses Nano Banana 2.
+The default text, image, narration, transcription and reference-analysis paths all use OpenRouter with OPENROUTER_API_KEY. See docs/Configuration.md for per-task models. Local text/TTS/STT providers are explicit opt-ins.
 
 ### Key Modules
-- **`src/llm_provider.py`** — unified `generate_text(prompt)` function using the Ollama Python SDK
+- **`src/openrouter_client.py`** — authenticated OpenRouter requests and structured responses
+- **`src/openrouter_media.py`** — images, speech-to-WAV, timestamped SRT captions
+- **`src/llm_provider.py`** — unified text generation through the configured provider
 - **`src/config.py`** — 30+ getter functions, each re-reads `config.json` on every call (no caching). `ROOT_DIR` = project root, computed as `os.path.dirname(sys.path[0])`
 - **`src/cache.py`** — JSON file persistence in `.mp/` directory (accounts, videos, posts, products)
 - **`src/constants.py`** — menu strings, Selenium selectors (YouTube Studio, X.com, Amazon)
@@ -58,7 +60,7 @@ LLM always uses the local Ollama server. Image generation always uses Nano Banan
 - **`src/classes/Twitter.py`** — Selenium automation against x.com
 - **`src/classes/AFM.py`** — Amazon scraping + LLM pitch generation
 - **`src/classes/LeadScraper.py`** — Google Maps scraper (requires Go) + phone normalization; exposes `get_leads(niche=...)` pull API for other pipelines
-- **`src/classes/Tts.py`** — KittenTTS wrapper
+- **`src/classes/Tts.py`** — OpenRouter TTS by default, optional local KittenTTS
 
 ### Data Storage
 All persistent state lives in `.mp/` at the project root as JSON files (`youtube.json`, `twitter.json`, `afm.json`). This directory also serves as scratch space for temporary WAV, PNG, SRT, and MP4 files — non-JSON files are cleaned on each run by `rem_temp_files()`.
@@ -76,7 +78,7 @@ All config lives in `config.json` at the project root. See `config.example.json`
 - **ImageMagick** — required for MoviePy subtitle rendering (`imagemagick_path`)
 - **Firefox profile** — must be pre-logged-in to target platforms (`firefox_profile`)
 - **Ollama** — for LLM text generation (via `ollama` Python SDK)
-- **Nano Banana 2** — for image generation (Gemini image API)
+- **OpenRouter** — one key for text, image generation, reference analysis, TTS and caption transcription
 - **Go** — only needed for LeadScraper (Google Maps scraper)
 
 ## Contributing

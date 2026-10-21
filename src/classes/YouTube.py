@@ -1,14 +1,13 @@
 import re
-import base64
 import json
 import time
 import os
-import requests
-import assemblyai as aai
 
 from utils import *
 from cache import *
 from .Tts import TTS
+from openrouter_client import OpenRouterError
+from openrouter_media import generate_image as generate_openrouter_image, transcribe_subtitles
 from browser import close_browser_context, get_active_page, launch_persistent_chromium
 from llm_provider import generate_text
 from config import *
@@ -423,78 +422,17 @@ class YouTube:
 
         return image_path
 
-    def generate_image_nanobanana2(self, prompt: str) -> str:
-        """
-        Generates an AI Image using Nano Banana 2 API (Gemini image API).
-
-        Args:
-            prompt (str): Prompt for image generation
-
-        Returns:
-            path (str): The path to the generated image.
-        """
-        print(f"Generating Image using Nano Banana 2 API: {prompt}")
-
-        api_key = get_nanobanana2_api_key()
-        if not api_key:
-            error("nanobanana2_api_key is not configured.")
-            return None
-
-        base_url = get_nanobanana2_api_base_url().rstrip("/")
-        model = get_nanobanana2_model()
-        aspect_ratio = get_nanobanana2_aspect_ratio()
-
-        endpoint = f"{base_url}/models/{model}:generateContent"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseModalities": ["IMAGE"],
-                "imageConfig": {"aspectRatio": aspect_ratio},
-            },
-        }
-
-        try:
-            response = requests.post(
-                endpoint,
-                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-                json=payload,
-                timeout=300,
-            )
-            response.raise_for_status()
-            body = response.json()
-
-            candidates = body.get("candidates", [])
-            for candidate in candidates:
-                content = candidate.get("content", {})
-                for part in content.get("parts", []):
-                    inline_data = part.get("inlineData") or part.get("inline_data")
-                    if not inline_data:
-                        continue
-                    data = inline_data.get("data")
-                    mime_type = inline_data.get("mimeType") or inline_data.get("mime_type", "")
-                    if data and str(mime_type).startswith("image/"):
-                        image_bytes = base64.b64decode(data)
-                        return self._persist_image(image_bytes, "Nano Banana 2 API")
-
-            if get_verbose():
-                warning(f"Nano Banana 2 did not return an image payload. Response: {body}")
-            return None
-        except Exception as e:
-            if get_verbose():
-                warning(f"Failed to generate image with Nano Banana 2 API: {str(e)}")
-            return None
-
     def generate_image(self, prompt: str) -> str:
-        """
-        Generates an AI Image based on the given prompt using Nano Banana 2.
+        """Generates and saves a PNG using OpenRouter's image API."""
+        try:
+            return self._persist_image(generate_openrouter_image(prompt), "OpenRouter")
+        except OpenRouterError as exc:
+            warning(f"이미지 생성 실패: {exc}")
+            return None
 
-        Args:
-            prompt (str): Reference for image generation
-
-        Returns:
-            path (str): The path to the generated image.
-        """
-        return self.generate_image_nanobanana2(prompt)
+    def generate_image_nanobanana2(self, prompt: str) -> str:
+        """Compatibility alias; all image requests now use OpenRouter."""
+        return self.generate_image(prompt)
 
     def generate_title_image(self, title: Optional[str] = None) -> Optional[str]:
         """
@@ -526,7 +464,7 @@ class YouTube:
 
     def generate_script_to_speech(self, tts_instance: TTS) -> str:
         """
-        Converts the generated script into Speech using KittenTTS and returns the path to the wav file.
+        Converts the generated script into Speech using the configured TTS provider and returns the path to the wav file.
 
         Args:
             tts_instance (tts): Instance of TTS Class.
@@ -572,48 +510,14 @@ class YouTube:
             write_json_atomic(cache, previous_json)
 
     def generate_subtitles(self, audio_path: str) -> str:
-        """
-        Generates subtitles for the audio using the configured STT provider.
-
-        Args:
-            audio_path (str): The path to the audio file.
-
-        Returns:
-            path (str): The path to the generated SRT File.
-        """
-        provider = str(get_stt_provider() or "local_whisper").lower()
-
+        """Generates timed SRT captions through the selected STT provider."""
+        provider = str(get_stt_provider()).strip().lower()
+        if provider == "openrouter":
+            srt_path = os.path.join(ROOT_DIR, ".mp", str(uuid4()) + ".srt")
+            return transcribe_subtitles(audio_path, srt_path, self._language)
         if provider == "local_whisper":
             return self.generate_subtitles_local_whisper(audio_path)
-
-        if provider == "third_party_assemblyai":
-            return self.generate_subtitles_assemblyai(audio_path)
-
-        warning(f"Unknown stt_provider '{provider}'. Falling back to local_whisper.")
-        return self.generate_subtitles_local_whisper(audio_path)
-
-    def generate_subtitles_assemblyai(self, audio_path: str) -> str:
-        """
-        Generates subtitles using AssemblyAI.
-
-        Args:
-            audio_path (str): Audio file path
-
-        Returns:
-            path (str): Path to SRT file
-        """
-        aai.settings.api_key = get_assemblyai_api_key()
-        config = aai.TranscriptionConfig()
-        transcriber = aai.Transcriber(config=config)
-        transcript = transcriber.transcribe(audio_path)
-        subtitles = transcript.export_subtitles_srt()
-
-        srt_path = os.path.join(ROOT_DIR, ".mp", str(uuid4()) + ".srt")
-
-        with open(srt_path, "w") as file:
-            file.write(subtitles)
-
-        return srt_path
+        raise ValueError(f"지원하지 않는 stt_provider입니다: {provider}")
 
     def _format_srt_timestamp(self, seconds: float) -> str:
         """
@@ -647,7 +551,7 @@ class YouTube:
         except ImportError:
             error(
                 "Local STT selected but 'faster-whisper' is not installed. "
-                "Install it or switch stt_provider to third_party_assemblyai."
+                "Install it or switch stt_provider to openrouter."
             )
             raise
 
@@ -796,7 +700,7 @@ class YouTube:
         try:
             subtitles_path = self.generate_subtitles(self.tts_path)
             equalize_subtitles(subtitles_path, 10)
-            subtitles = SubtitlesClip(subtitles_path, generator)
+            subtitles = SubtitlesClip(subtitles_path, make_textclip=generator, encoding="utf-8")
             subtitles = _with_position(subtitles, ("center", "center"))
         except Exception as e:
             warning(f"Failed to generate subtitles, continuing without subtitles: {e}")
@@ -853,7 +757,7 @@ class YouTube:
 
         if len(self.images) == 0:
             raise RuntimeError(
-                "No images were generated. Check your Nano Banana 2 configuration."
+                "No images were generated. Check your OpenRouter configuration."
             )
 
         # Generate the TTS

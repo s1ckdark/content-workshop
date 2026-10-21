@@ -56,8 +56,6 @@ elif [[ -d "$HOME/Library/Application Support/Chromium" ]]; then
   BROWSER_PROFILE="$HOME/Library/Application Support/Chromium"
 fi
 
-OLLAMA_MODELS_JSON="$(curl -sS http://127.0.0.1:11434/api/tags || true)"
-
 MAGICK_PATH="$MAGICK_PATH" BROWSER_PROFILE="$BROWSER_PROFILE" "$PYTHON_BIN" - <<'PY'
 import json
 import os
@@ -69,16 +67,20 @@ cfg_path = os.path.join(ROOT_DIR, "config.json")
 with open(cfg_path, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
-cfg.setdefault("stt_provider", "local_whisper")
+cfg.setdefault("llm_provider", "openrouter")
+if cfg["llm_provider"] == "openrouter":
+    cfg.setdefault("llm_base_url", "https://openrouter.ai/api/v1")
+    cfg.setdefault("llm_model", "google/gemini-2.5-flash")
+cfg.setdefault("stt_provider", "openrouter")
+cfg.setdefault("openrouter_stt_model", "openai/whisper-1")
+cfg.setdefault("tts_provider", "openrouter")
+cfg.setdefault("openrouter_tts_model", "google/gemini-3.1-flash-tts-preview")
+cfg.setdefault("openrouter_tts_voice", "Kore")
+cfg.setdefault("reference_analysis_model", "google/gemini-2.5-flash")
+cfg.setdefault("image_model", "google/gemini-3.1-flash-image-preview")
+cfg.setdefault("image_aspect_ratio", "9:16")
 cfg.setdefault("ollama_base_url", "http://127.0.0.1:11434")
 cfg.setdefault("ollama_model", "")
-cfg.setdefault(
-    "nanobanana2_api_base_url",
-    "https://generativelanguage.googleapis.com/v1beta",
-)
-cfg.setdefault("nanobanana2_api_key", "")
-cfg.setdefault("nanobanana2_model", "gemini-3.1-flash-image-preview")
-cfg.setdefault("nanobanana2_aspect_ratio", "9:16")
 cfg.setdefault("whisper_model", "base")
 cfg.setdefault("whisper_device", "auto")
 cfg.setdefault("whisper_compute_type", "int8")
@@ -95,12 +97,13 @@ if browser_profile and not cfg.get("browser_profile"):
 ollama_model = cfg.get("ollama_model", "llama3.2:3b")
 installed = []
 try:
-    out = subprocess.check_output(
-        ["curl", "-sS", "http://127.0.0.1:11434/api/tags"],
-        text=True,
-    )
-    payload = json.loads(out)
-    installed = [m.get("name") for m in payload.get("models", []) if m.get("name")]
+    if cfg["llm_provider"] == "ollama":
+        out = subprocess.check_output(
+            ["curl", "-sS", "--max-time", "5", cfg["ollama_base_url"].rstrip("/") + "/api/tags"],
+            text=True,
+        )
+        payload = json.loads(out)
+        installed = [m.get("name") for m in payload.get("models", []) if m.get("name")]
 except Exception:
     installed = []
 
@@ -130,8 +133,8 @@ with open(cfg_path, "w", encoding="utf-8") as f:
     f.write("\n")
 
 print(f"[setup] Updated {cfg_path}")
-print(f"[setup] ollama_model={cfg.get('ollama_model')}")
-print(f"[setup] nanobanana2_model={cfg.get('nanobanana2_model')}")
+print(f"[setup] llm_provider={cfg.get('llm_provider')}")
+print(f"[setup] image_model={cfg.get('image_model')}")
 print(f"[setup] stt_provider={cfg.get('stt_provider')}")
 PY
 

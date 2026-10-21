@@ -1,5 +1,7 @@
 # 레퍼런스 기반 포맷 템플릿 Implementation Plan
 
+> 2026-10-21 업데이트: 이 문서는 최초 Gemini 직접 호출 설계/계획의 기록입니다. 현재 구현은 OpenRouter를 사용합니다. API 설정과 모델은 [Configuration.md](../../Configuration.md)를 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 레퍼런스 쇼츠 URL에서 포맷 템플릿을 추출·저장하고, 템플릿이 연결된 YouTube 계정의 영상 생성(주제·대본·이미지·자막·한국어 TTS)에 반영한다.

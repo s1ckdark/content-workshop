@@ -33,7 +33,7 @@ def ensure_model_selected(parent: QWidget | None = None) -> bool:
         QMessageBox.warning(
             parent,
             "사용 가능한 모델 없음",
-            "LLM 서버에 사용할 수 있는 모델이 없습니다. 먼저 모델을 받아 주세요.",
+            "사용할 수 있는 모델이 없습니다. 제공자 설정과 모델 접근 권한을 확인해 주세요.",
         )
         return False
 

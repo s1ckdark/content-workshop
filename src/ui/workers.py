@@ -3,7 +3,7 @@ Background workers for long-running pipelines. Each worker is a QObject that
 moveToThread()s onto a QThread; JobDialog drives the lifecycle.
 
 Cancellation is cooperative — the worker checks self._cancelled between
-sub-steps. We can't kill MoviePy mid-encode or a Nano Banana 2 HTTP call
+sub-steps. We can't kill MoviePy mid-encode or a OpenRouter HTTP call
 that's already in flight, so cancel = "stop after the current step".
 """
 
@@ -117,7 +117,7 @@ class VideoWorker(QObject):
         self._image_loop()
 
         if not self._yt.images:
-            raise RuntimeError("생성된 이미지가 없습니다. Nano Banana 2 설정을 확인하세요.")
+            raise RuntimeError("생성된 이미지가 없습니다. OpenRouter 설정을 확인하세요.")
 
         self.progress.emit("음성 합성 (TTS)", 75)
         self._yt.generate_script_to_speech(TTS())
@@ -141,7 +141,7 @@ class VideoWorker(QObject):
     def _image_loop(self) -> None:
         """
         Per-image progress with cold-start weighting + one retry on None.
-        The first image is weighted 2× because Nano Banana 2 first-call latency
+        The first image is weighted 2× because OpenRouter first-call latency
         is consistently higher than steady-state.
         """
         prompts = self._yt.image_prompts
